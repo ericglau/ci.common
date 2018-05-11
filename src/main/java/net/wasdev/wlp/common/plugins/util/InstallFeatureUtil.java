@@ -45,21 +45,62 @@ import org.xml.sax.SAXException;
 
 public abstract class InstallFeatureUtil {
     
+    /**
+     * Log debug
+     * @param msg
+     */
     public abstract void debug(String msg);
 
+    /**
+     * Log debug
+     * @param msg
+     * @param e
+     */
     public abstract void debug(String msg, Throwable e);
 
+    /**
+     * Log debug
+     * @param e
+     */
     public abstract void debug(Throwable e);
 
+    /**
+     * Log warning
+     * @param msg
+     */
     public abstract void warn(String msg);
 
+    /**
+     * Log info
+     * @param msg
+     */
     public abstract void info(String msg);
 
+    /**
+     * Returns whether debug is enabled by the current logger
+     * @return whether debug is enabled
+     */
     public abstract boolean isDebugEnabled();
 
+    /**
+     * Download the artifact from the specified Maven coordinates, or retrieve it from the cache if it already exists.
+     * 
+     * @param groupId The group ID
+     * @param artifactId The artifact ID
+     * @param type The type e.g. esa
+     * @param version The version
+     * @return The file corresponding to the downloaded artifact
+     * @throws PluginExecutionException If the artifact could not be downloaded
+     */
     public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
             throws PluginExecutionException;
     
+    /**
+     * Combine the given String collections into a set
+     * 
+     * @param collections a collection of strings
+     * @return the combined set of strings
+     */
     @SafeVarargs
     public static Set<String> combineToSet(Collection<String>... collections) {
         Set<String> result = new HashSet<String>();
@@ -69,6 +110,12 @@ public abstract class InstallFeatureUtil {
         return result;
     }
     
+    /**
+     * Get the set of features defined in the server.xml if there were no features listed in the plugin configuration
+     * @param serverDirectory The server directory containing the server.xml
+     * @param noFeaturesConfigurationElements true if there were no features listed in the plugin configuration
+     * @return the set of features that should be installed from server.xml
+     */
     public Set<String> getServerFeatures(File serverDirectory, boolean noFeaturesConfigurationElements) {
         // parse server.xml features only if there are no configured features in the pom
         Set<String> result = new HashSet<String>();
@@ -108,7 +155,7 @@ public abstract class InstallFeatureUtil {
         return result;
     }
 
-    public Set<String> getServerXmlFeatures(File fileContext, String serverFile, List<String> parsedXmls) {
+    private Set<String> getServerXmlFeatures(File fileContext, String serverFile, List<String> parsedXmls) {
         Set<String> result = new HashSet<String>();
         File serverXml = new File(fileContext, serverFile);
         List<String> updatedParsedXmls = new ArrayList<String>();
@@ -179,6 +226,12 @@ public abstract class InstallFeatureUtil {
         return result;
     }
     
+    /**
+     * Get the JSON files corresponding to the product properties from the lib/versions/*.properties files
+     * @param installDirectory The install directory
+     * @return the set of JSON files for the product
+     * @throws PluginExecutionException if properties files could not be found from lib/versions
+     */
     public Set<File> downloadProductJsons(File installDirectory) throws PluginExecutionException {
         // get productId and version for all properties
         File versionsDir = new File(installDirectory, "lib/versions");
@@ -265,7 +318,7 @@ public abstract class InstallFeatureUtil {
         return list;
     }
     
-    public class ProductProperties {
+    private class ProductProperties {
         private String id;
         private String version;
         
