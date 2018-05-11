@@ -113,19 +113,19 @@ public abstract class InstallFeatureUtil {
     /**
      * Get the set of features defined in the server.xml if there were no features listed in the plugin configuration
      * @param serverDirectory The server directory containing the server.xml
-     * @param noFeaturesConfigurationElements true if there were no features listed in the plugin configuration
+     * @param noPluginListedFeatures true if there were no features listed in the plugin configuration
      * @return the set of features that should be installed from server.xml
      */
-    public Set<String> getServerFeatures(File serverDirectory, boolean noFeaturesConfigurationElements) {
+    public Set<String> getServerFeatures(File serverDirectory, boolean noPluginListedFeatures) {
         // parse server.xml features only if there are no configured features in the pom
         Set<String> result = new HashSet<String>();
-        if (noFeaturesConfigurationElements) {
-            debug("No features configuration elements were specified. Using server.xml.");
+        if (noPluginListedFeatures) {
+            debug("No features were listed for the plugin. Using server.xml.");
             result.addAll(getConfigDropinFeatures(serverDirectory, "overrides"));
             result.addAll(getServerXmlFeatures(serverDirectory, "server.xml", null));
             result.addAll(getConfigDropinFeatures(serverDirectory, "defaults"));
         } else {
-            debug("Features configuration elements were specified. Skipping server.xml.");
+            debug("Features were listed for the plugin. Skipping server.xml.");
         }
         return result;
     }
@@ -346,16 +346,16 @@ public abstract class InstallFeatureUtil {
      * 
      * @param from the "from" parameter specified in the plugin
      * @param to the "to" parameter specified in the plugin
-     * @param hasEsaConfigurationElements whether there are ESA files specified in the plugin configuration
+     * @param hasPluginListedEsas whether there are ESA files specified in the plugin configuration
      * @return true if the fallback scenario occurred, false otherwise
      */
-    public boolean hasUnsupportedParameters(String from, String to, boolean hasEsaConfigurationElements) {
+    public boolean hasUnsupportedParameters(String from, String to, boolean hasPluginListedEsas) {
         boolean hasFrom = from != null;
         boolean hasTo = !"usr".equals(to) && !"core".equals(to);
         debug("hasFrom: " + hasFrom);
         debug("hasTo: " + hasTo);
-        debug("hasEsaConfigurationElements: " + hasEsaConfigurationElements);
-        boolean result = hasFrom || hasTo || hasEsaConfigurationElements;
+        debug("hasPluginListedEsas: " + hasPluginListedEsas);
+        boolean result = hasFrom || hasTo || hasPluginListedEsas;
         if (result) {
             debug("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files. Using installUtility instead.");
         }
