@@ -43,6 +43,9 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+/**
+ * Utility class to install features from Maven repositories.
+ */
 public abstract class InstallFeatureUtil {
     
     /**
@@ -97,18 +100,20 @@ public abstract class InstallFeatureUtil {
     
     private final File installDirectory;
     
-    private boolean isInitialized = false;
+    private final Set<File> downloadedJsons;
     
-    private Set<File> downloadedJsons;
-    
-    public InstallFeatureUtil(File installDirectory) {
+    /**
+     * Initialize the utility and check for unsupported scenarios.
+     * 
+     * @param installDirectory The install directory
+     * @param from The "from" parameter specified in the plugin configuration, or null if not specified
+     * @param to The "to" parameter specified in the plugin configuration, or null if not specified
+     * @param pluginListedEsas The list of ESAs specified in the plugin configuration, or null if not specified
+     * @throws PluginScenarioException If the current scenario is not supported
+     * @throws PluginExecutionException If properties files cannot be found in the installDirectory/lib/versions
+     */
+    public InstallFeatureUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
         this.installDirectory = installDirectory;
-    }
-    
-    public void init(String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
-        if (isInitialized) {
-            throw new IllegalStateException(this.getClass().getName() + " has alread been initialized");
-        }
         if (getMapBasedInstallKernelJar(installDirectory) == null) {
             throw new PluginScenarioException("Install map jar not found.");
         }
@@ -119,7 +124,6 @@ public abstract class InstallFeatureUtil {
         if (hasUnsupportedParameters(from, to, pluginListedEsas)) {
             throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
         }
-        isInitialized = true;
     }
     
     /**
@@ -408,8 +412,6 @@ public abstract class InstallFeatureUtil {
      * downloads the ESAs corresponding to the resolved features, then installs
      * those features.
      * 
-     * Must call {@link #init(File, String, String, Set) init} before this invoking method.
-     * 
      * @param jsonRepos
      *            JSON files, each containing an array of metadata for all
      *            features in a Liberty release.
@@ -419,9 +421,6 @@ public abstract class InstallFeatureUtil {
      *             if any of the features could not be installed
      */
     public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall) throws PluginExecutionException {
-        if (!isInitialized) {
-            throw new IllegalStateException(this.getClass().getName() + " has not been initialized");
-        }
         List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
         info("Installing features: " + featuresToInstall);
