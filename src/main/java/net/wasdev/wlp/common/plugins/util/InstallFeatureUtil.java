@@ -95,6 +95,33 @@ public abstract class InstallFeatureUtil {
     public abstract File downloadArtifact(String groupId, String artifactId, String type, String version)
             throws PluginExecutionException;
     
+    private final File installDirectory;
+    
+    private boolean isInitialized = false;
+    
+    private Set<File> downloadedJsons;
+    
+    public InstallFeatureUtil(File installDirectory) {
+        this.installDirectory = installDirectory;
+    }
+    
+    public void init(String from, String to, Set<String> pluginListedEsas) throws PluginScenarioException, PluginExecutionException {
+        if (isInitialized) {
+            throw new IllegalStateException(this.getClass().getName() + " has alread been initialized");
+        }
+        if (getMapBasedInstallKernelJar(installDirectory) == null) {
+            throw new PluginScenarioException("Install map jar not found.");
+        }
+        downloadedJsons = downloadProductJsons(installDirectory);
+        if (downloadedJsons.isEmpty()) {
+            throw new PluginScenarioException("Cannot find JSONs for to the installed runtime from the Maven repository.");
+        }
+        if (hasUnsupportedParameters(from, to, pluginListedEsas)) {
+            throw new PluginScenarioException("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files.");
+        }
+        isInitialized = true;
+    }
+    
     /**
      * Combine the given String collections into a set
      * 
@@ -232,7 +259,7 @@ public abstract class InstallFeatureUtil {
      * @return the set of JSON files for the product
      * @throws PluginExecutionException if properties files could not be found from lib/versions
      */
-    public Set<File> downloadProductJsons(File installDirectory) throws PluginExecutionException {
+    private Set<File> downloadProductJsons(File installDirectory) throws PluginExecutionException {
         // get productId and version for all properties
         File versionsDir = new File(installDirectory, "lib/versions");
         List<ProductProperties> propertiesList = loadProperties(versionsDir);
@@ -346,20 +373,17 @@ public abstract class InstallFeatureUtil {
      * 
      * @param from the "from" parameter specified in the plugin
      * @param to the "to" parameter specified in the plugin
-     * @param hasPluginListedEsas whether there are ESA files specified in the plugin configuration
+     * @param pluginListedEsas the ESA files specified in the plugin configuration
      * @return true if the fallback scenario occurred, false otherwise
      */
-    public boolean hasUnsupportedParameters(String from, String to, boolean hasPluginListedEsas) {
+    private boolean hasUnsupportedParameters(String from, String to, Set<String> pluginListedEsas) {
         boolean hasFrom = from != null;
         boolean hasTo = !"usr".equals(to) && !"core".equals(to);
+        boolean hasPluginListedEsas = !pluginListedEsas.isEmpty();
         debug("hasFrom: " + hasFrom);
         debug("hasTo: " + hasTo);
         debug("hasPluginListedEsas: " + hasPluginListedEsas);
-        boolean result = hasFrom || hasTo || hasPluginListedEsas;
-        if (result) {
-            debug("Cannot install features from a Maven repository when using the 'to' or 'from' parameters or when specifying ESA files. Using installUtility instead.");
-        }
-        return result;
+        return hasFrom || hasTo || hasPluginListedEsas;
     }
     
     private File downloadEsaArtifact(String mavenCoordinates) throws PluginExecutionException {
@@ -384,6 +408,8 @@ public abstract class InstallFeatureUtil {
      * downloads the ESAs corresponding to the resolved features, then installs
      * those features.
      * 
+     * Must call {@link #init(File, String, String, Set) init} before this invoking method.
+     * 
      * @param jsonRepos
      *            JSON files, each containing an array of metadata for all
      *            features in a Liberty release.
@@ -392,7 +418,11 @@ public abstract class InstallFeatureUtil {
      * @throws PluginExecutionException
      *             if any of the features could not be installed
      */
-    public void installFeatures(File installDirectory, boolean isAcceptLicense, List<File> jsonRepos, List<String> featuresToInstall) throws PluginExecutionException {
+    public void installFeatures(boolean isAcceptLicense, List<String> featuresToInstall) throws PluginExecutionException {
+        if (!isInitialized) {
+            throw new IllegalStateException(this.getClass().getName() + " has not been initialized");
+        }
+        List<File> jsonRepos = new ArrayList<File>(downloadedJsons);
         debug("JSON repos: " + jsonRepos);
         info("Installing features: " + featuresToInstall);
 
@@ -473,7 +503,7 @@ public abstract class InstallFeatureUtil {
      * 
      * @return the install map jar file
      */
-    public File getMapBasedInstallKernelJar(File installDirectory) {
+    private File getMapBasedInstallKernelJar(File installDirectory) {
         final String installMapPrefix = "com.ibm.ws.install.map";
         final String installMapSuffix = ".jar";
 
