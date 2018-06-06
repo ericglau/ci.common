@@ -4,4 +4,7 @@
         <feature>orig</feature>
     </featureManager>
     <include location="extraFeatures.xml" onConflict="MERGE"/>
+    <include location="extraFeatures2.xml" onConflict="IGNORE"/>
+    <include location="extraFeatures3.xml" onConflict="REPLACE"/>
+    <include location="extraFeatures4.xml" onConflict="MERGE"/>
 </server>

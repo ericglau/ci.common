@@ -3,4 +3,5 @@
     <featureManager>
         <feature>orig</feature>
     </featureManager>
+    <include location="noList.xml" onConflict="REPLACE"/>
 </server>

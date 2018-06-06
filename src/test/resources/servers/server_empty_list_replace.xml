@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <server description="new server">
-	<featureManager>
+    <featureManager>
         <feature>jsp-2.3</feature>
     </featureManager>
-    <include location="multipleReplace2.xml" onConflict="REPLACE"/>
+    <include location="emptyList.xml" onConflict="REPLACE"/>
 </server>

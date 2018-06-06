@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <server description="new server">
 	<featureManager>
-        <feature>authData-1.0</feature>
+        <feature>extra4</feature>
     </featureManager>
-     <include location="multipleReplace3.xml" onConflict="REPLACE"/>
 </server>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <server description="new server">
     <featureManager>
-        <feature>adminCenter-1.0</feature>
+        <feature>override</feature>
     </featureManager>
 </server>
