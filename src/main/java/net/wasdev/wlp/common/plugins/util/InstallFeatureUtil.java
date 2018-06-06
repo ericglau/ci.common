@@ -174,31 +174,26 @@ public abstract class InstallFeatureUtil {
      */
     public static Set<String> getServerFeatures(File serverDirectory) {
         Set<String> result = new HashSet<String>();
-        result.addAll(getConfigDropinFeatures(serverDirectory, "overrides"));
+        result.addAll(getConfigDropinsFeatures(serverDirectory, "overrides"));
         result.addAll(getServerXmlFeatures(new File(serverDirectory, "server.xml"), null));
-        result.addAll(getConfigDropinFeatures(serverDirectory, "defaults"));
+        result.addAll(getConfigDropinsFeatures(serverDirectory, "defaults"));
         return result;
     }
     
-    private static Set<String> getConfigDropinFeatures(File serverDirectory, String folderName) {
+    private static Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
         Set<String> result = new HashSet<String>();
-        String configDropins = serverDirectory.getAbsolutePath() + "/configDropins/" + folderName;
-        File configDropinsFolder = new File(configDropins);
-        String[] configDropinsFileList = configDropinsFolder.list();
-        if (configDropinsFileList == null) {
-            return result;
-        }
-        List<String> configDropinsXmls = new ArrayList<String>();
-        for (String xml : configDropinsFileList){
-            if (xml.endsWith(".xml")) {
-                configDropinsXmls.add(configDropins + "/" +xml);
+        File configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName);
+        File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.endsWith(".xml");
             }
-        }
-        if (configDropinsXmls.isEmpty()) {
+        });
+        if (configDropinsXmls == null || configDropinsXmls.length == 0) {
             return result;
         }
-        for (String filename : configDropinsXmls) {
-            result.addAll(getServerXmlFeatures(new File(filename), null));
+        for (File xml : configDropinsXmls) {
+            result.addAll(getServerXmlFeatures(xml, null));
         }
         return result;
     }
@@ -206,8 +201,13 @@ public abstract class InstallFeatureUtil {
     private static Set<String> getServerXmlFeatures(File serverFile, List<File> parsedXmls) {
         Set<String> result = new HashSet<String>();
         List<File> updatedParsedXmls = new ArrayList<File>();
-        updatedParsedXmls.add(serverFile);
-        if (parsedXmls != null){
+        try {
+            updatedParsedXmls.add(serverFile.getCanonicalFile());
+        } catch (IOException e) {
+            // just skip this server.xml if it cannot be parsed
+            return result;
+        }
+        if (parsedXmls != null) {
             updatedParsedXmls.addAll(parsedXmls);
         }
         if (serverFile.exists()) {
@@ -232,6 +232,7 @@ public abstract class InstallFeatureUtil {
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
                 // just skip this server.xml if it cannot be parsed
+                return result;
             }
         }
         return result;
