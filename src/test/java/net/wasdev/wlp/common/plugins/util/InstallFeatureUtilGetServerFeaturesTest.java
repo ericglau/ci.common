@@ -132,8 +132,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -157,8 +156,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -183,8 +181,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
     
     /**
@@ -208,8 +205,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -237,8 +233,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     	Set<String> getServerResult = new HashSet<String>();
     	File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
     	getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-    	System.out.println("result: " + getServerResult);
-    	assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -269,8 +264,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -301,8 +295,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
     /**
@@ -341,8 +334,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         Set<String> getServerResult = new HashSet<String>();
         File serverDirectory = new File(installDirectory + "/wlp/usr/servers/test");
         getServerResult = InstallFeatureUtil.getServerFeatures(serverDirectory);
-        System.out.println("result: " + getServerResult);
-        assertTrue("The features returned from getServerFeatures do not equal the expectedFeatures",getServerResult.equals(expected));
+        assertEquals("The features returned from getServerFeatures do not equal the expectedFeatures.", expected, getServerResult);
     }
 
 }
