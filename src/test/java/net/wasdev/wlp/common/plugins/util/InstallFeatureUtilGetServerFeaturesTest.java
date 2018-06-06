@@ -134,11 +134,11 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     @Test
     public void testConfigOverrides() throws Exception{
         copy("server.xml");
-        copyAsName("config_override.xml", "configDropins/overrides/config_override.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
 
         Set<String> expected = new HashSet<String>();
         expected.add("orig");
-        expected.add("override");
+        expected.add("overrides");
 
         verifyServerFeatures(expected);
     }
@@ -151,11 +151,11 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     @Test
     public void testConfigDefaults() throws Exception{
         copy("server.xml");
-        copyAsName("config_default.xml", "configDropins/defaults/config_default.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
 
         Set<String> expected = new HashSet<String>();
         expected.add("orig");
-        expected.add("default");
+        expected.add("defaults");
 
         verifyServerFeatures(expected);
     }
@@ -168,13 +168,13 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     @Test
     public void testOverridesAndDefaults() throws Exception{
         copy("server.xml");
-        copyAsName("config_override.xml", "configDropins/overrides/config_override.xml");
-        copyAsName("config_default.xml", "configDropins/defaults/config_default.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
 
         Set<String> expected = new HashSet<String>();
         expected.add("orig");
-        expected.add("override");
-        expected.add("default");
+        expected.add("overrides");
+        expected.add("defaults");
 
         verifyServerFeatures(expected);
     }
@@ -291,39 +291,48 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     @Test
     public void testCombinationEmptyReplace() throws Exception{
         copyAsName("server_combination_empty_replace.xml", "server.xml");
-        copyAsName("config_override.xml", "configDropins/overrides/config_override.xml");
-        copyAsName("config_default.xml", "configDropins/defaults/config_default.xml");
-        copy("extraFeatures.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+        
+        // includes
+        copy("extraFeatures.xml"); // merge
+        copy("extraFeatures2.xml"); // ignore
+        copy("emptyList.xml"); // replace
+        copy("extraFeatures4.xml"); // merge
 
-        // Keep everything except the ignore (obviously).
-        // Do not replace existing contents since replace file is empty.
+        // Keep everything except 2nd include (since it is ignored) and 3rd include (since it is empty)
         Set<String> expected = new HashSet<String>();
         expected.add("orig");
-        expected.add("override");
-        expected.add("default");
+        expected.add("overrides");
+        expected.add("defaults");
         expected.add("extra");
-        expected.add("extra3");
+        expected.add("extra4");
         
         verifyServerFeatures(expected);
     }
     
     /**
-     * Tests server.xml with a combination of everything, including a replace that is empty
+     * Tests server.xml with a combination of everything, including a replace
      * 
      * @throws Exception
      */
     @Test
     public void testCombinationWithReplace() throws Exception{
         copyAsName("server_combination_replace.xml", "server.xml");
-        copyAsName("config_override.xml", "configDropins/overrides/config_override.xml");
-        copyAsName("config_default.xml", "configDropins/defaults/config_default.xml");
-        copy("extraFeatures.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+        
+        // includes
+        copy("extraFeatures.xml"); // merge
+        copy("extraFeatures2.xml"); // ignore
+        copy("extraFeatures3.xml"); // replace
+        copy("extraFeatures4.xml"); // merge
 
-        // Only keep the configDropins and the replace
+        // Only keep overrides, 3rd include (since it is replace), and 4th include (since it comes after)
         Set<String> expected = new HashSet<String>();
-        expected.add("override");
-        expected.add("default");
+        expected.add("overrides");
         expected.add("extra3");
+        expected.add("extra4");
         
         verifyServerFeatures(expected);
     }
