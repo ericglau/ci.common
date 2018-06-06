@@ -182,7 +182,13 @@ public abstract class InstallFeatureUtil {
     
     private static Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
         Set<String> result = new HashSet<String>();
-        File configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName);
+        File configDropinsFolder;
+        try {
+            configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
+        } catch (IOException e) {
+            // skip this directory if its path cannot be queried
+            return result;
+        }
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -201,23 +207,25 @@ public abstract class InstallFeatureUtil {
     private static Set<String> getServerXmlFeatures(File serverFile, List<File> parsedXmls) {
         Set<String> result = new HashSet<String>();
         List<File> updatedParsedXmls = new ArrayList<File>();
+        File canonicalServerFile;
         try {
-            updatedParsedXmls.add(serverFile.getCanonicalFile());
+            canonicalServerFile = serverFile.getCanonicalFile();
         } catch (IOException e) {
-            // just skip this server.xml if it cannot be parsed
+            // skip this server.xml if its path cannot be queried
             return result;
         }
+        updatedParsedXmls.add(canonicalServerFile);
         if (parsedXmls != null) {
             updatedParsedXmls.addAll(parsedXmls);
         }
-        if (serverFile.exists()) {
+        if (canonicalServerFile.exists()) {
             try {
                 Document doc = new XmlDocument() {
                     public Document getDocument(File file) throws IOException, ParserConfigurationException, SAXException {
                         createDocument(file);
                         return doc;
                     }
-                }.getDocument(serverFile);
+                }.getDocument(canonicalServerFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
                 for (int i = 0; i < nodes.getLength(); i++) {
@@ -226,7 +234,7 @@ public abstract class InstallFeatureUtil {
                         if ("featureManager".equals(child.getNodeName())) {
                             result.addAll(parseFeatureManagerNode(child));
                         } else if ("include".equals(child.getNodeName())){
-                            result = parseIncludeNode(result, serverFile, child, updatedParsedXmls);
+                            result = parseIncludeNode(result, canonicalServerFile, child, updatedParsedXmls);
                         }
                     }
                 }
@@ -243,8 +251,16 @@ public abstract class InstallFeatureUtil {
         Set<String> result = origResult;
         String includeFileName = node.getAttribute("location");
         File includeFile = new File(includeFileName);
-        if (!includeFile.isAbsolute()){
-            includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName);
+        try {
+            if (!includeFile.isAbsolute()) {
+                includeFile = new File(serverFile.getParentFile().getAbsolutePath(), includeFileName)
+                        .getCanonicalFile();
+            } else {
+                includeFile = includeFile.getCanonicalFile();
+            }
+        } catch (IOException e) {
+            // skip this xml if its path cannot be queried
+            return result;
         }
         if (!updatedParsedXmls.contains(includeFile)){
             String onConflict = node.getAttribute("onConflict");
@@ -456,8 +472,8 @@ public abstract class InstallFeatureUtil {
                 debug("action.exception.stacktrace: "+mapBasedInstallKernel.get("action.exception.stacktrace"));
                 String exceptionMessage = (String) mapBasedInstallKernel.get("action.error.message");
                 if (exceptionMessage.contains("CWWKF1250I")){
-                    // the features are already installed, so no action is needed
                     info(exceptionMessage);
+                    info("The features are already installed, so no action is needed.");
                     return;
                 } else {
                     throw new PluginExecutionException(exceptionMessage);
@@ -563,7 +579,7 @@ public abstract class InstallFeatureUtil {
     }
     
     private static String extractVersion(String fileName) {
-        int startIndex = INSTALL_MAP_PREFIX.length() + 1;
+        int startIndex = INSTALL_MAP_PREFIX.length() + 1; // skip the underscore after the prefix
         int endIndex = fileName.lastIndexOf(INSTALL_MAP_SUFFIX);
         if (startIndex < endIndex) {
             return fileName.substring(startIndex, endIndex);
@@ -614,10 +630,8 @@ public abstract class InstallFeatureUtil {
         Scanner s = null;
         Worker worker = null;
         try {
-            String osName = System.getProperty("os.name", "unknown").toLowerCase();
-            boolean isWindows = osName.indexOf("windows") >= 0;
             String command;
-            if (isWindows) {
+            if (OSUtil.isWindows()) {
                 command = installDirectory + "\\bin\\productInfo.bat validate";
             } else {
                 command = installDirectory + "/bin/productInfo validate";
@@ -633,6 +647,7 @@ public abstract class InstallFeatureUtil {
             if (exitValue != 0) {
                 is = pr.getInputStream();
                 s = new Scanner(is);
+                // use regex to match the beginning of the input
                 s.useDelimiter("\\A");
                 if (s.hasNext()) {
                     throw new PluginExecutionException(s.next());
