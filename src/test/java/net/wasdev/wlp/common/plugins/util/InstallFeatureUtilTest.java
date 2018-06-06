@@ -167,23 +167,5 @@ public class InstallFeatureUtilTest {
         Set<String> result = InstallFeatureUtil.combineToSet(a, b, c);
         assertEquals(5, result.size());
     }
-    
-    @Test
-    public void testProductInfoValidate() throws Exception {
-        InstallFeatureTestUtil util = new InstallFeatureTestUtil(installDir, null, null, new HashSet<String>());
-        assertNotNull(util);
-        
-        File productInfo = new File(installDir, "bin/productInfo");
-        assertTrue(productInfo.setExecutable(true));
-        
-        File productInfoBat = new File(installDir, "bin/productInfo.bat");
-        assertTrue(productInfoBat.setExecutable(true));
-
-        util.resetLastInfoMessage();
-        assertNull(util.getLastInfoMessage());
-        
-        util.productInfoValidate();
-        assertNotNull(util.getLastInfoMessage());
-    }
 
 }
