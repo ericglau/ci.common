@@ -17,7 +17,6 @@ package net.wasdev.wlp.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -43,17 +42,6 @@ public class InstallFeatureUtilTest {
     public TemporaryFolder temp = new TemporaryFolder();
 
     private class InstallFeatureTestUtil extends InstallFeatureUtil {
-        
-        private String lastInfoMessage = null;
-        
-        public void resetLastInfoMessage() {
-            lastInfoMessage = null;
-        }
-        
-        public String getLastInfoMessage() {
-            return lastInfoMessage;
-        }
-        
         public InstallFeatureTestUtil(File installDirectory, String from, String to, Set<String> pluginListedEsas)  throws PluginScenarioException, PluginExecutionException {
             super(installDirectory, from, to, pluginListedEsas);
         }
@@ -80,7 +68,7 @@ public class InstallFeatureUtilTest {
 
         @Override
         public void info(String msg) {
-            lastInfoMessage = msg;
+            // not needed for tests
         }
 
         @Override
