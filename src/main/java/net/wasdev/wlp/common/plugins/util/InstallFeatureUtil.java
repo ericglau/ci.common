@@ -173,10 +173,10 @@ public abstract class InstallFeatureUtil {
      * @return the set of features that should be installed from server.xml
      */
     public static Set<String> getServerFeatures(File serverDirectory) {
-        Set<String> result = new HashSet<String>();
+        Set<String> defaults = getConfigDropinsFeatures(serverDirectory, "defaults");
+        Set<String> result = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
+        // add the overrides at the end since they should not be replaced by other content
         result.addAll(getConfigDropinsFeatures(serverDirectory, "overrides"));
-        result.addAll(getServerXmlFeatures(new File(serverDirectory, "server.xml"), null));
-        result.addAll(getConfigDropinsFeatures(serverDirectory, "defaults"));
         return result;
     }
     
@@ -199,13 +199,23 @@ public abstract class InstallFeatureUtil {
             return result;
         }
         for (File xml : configDropinsXmls) {
-            result.addAll(getServerXmlFeatures(xml, null));
+            Set<String> features = getServerXmlFeatures(null, xml, null);
+            if (features != null) {
+                result.addAll(features);
+            }
         }
         return result;
     }
 
-    private static Set<String> getServerXmlFeatures(File serverFile, List<File> parsedXmls) {
-        Set<String> result = new HashSet<String>();
+    /**
+     * 
+     * @param origResult
+     * @param serverFile
+     * @param parsedXmls
+     * @return list of features from the server.xml, or empty list of it has no features, or null if the file (and all of its children) has no featureManager sections
+     */
+    private static Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
+        Set<String> result = origResult;
         List<File> updatedParsedXmls = new ArrayList<File>();
         File canonicalServerFile;
         try {
@@ -228,14 +238,19 @@ public abstract class InstallFeatureUtil {
                 }.getDocument(canonicalServerFile);
                 Element root = doc.getDocumentElement();
                 NodeList nodes = root.getChildNodes();
+
                 for (int i = 0; i < nodes.getLength(); i++) {
                     if (nodes.item(i) instanceof Element) {
                         Element child = (Element) nodes.item(i);
                         if ("featureManager".equals(child.getNodeName())) {
+                            if (result == null) {
+                                result = new HashSet<String>();
+                            }
                             result.addAll(parseFeatureManagerNode(child));
                         } else if ("include".equals(child.getNodeName())){
                             result = parseIncludeNode(result, canonicalServerFile, child, updatedParsedXmls);
                         }
+                        // TODO see if order matters
                     }
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
@@ -262,14 +277,28 @@ public abstract class InstallFeatureUtil {
             // skip this xml if its path cannot be queried
             return result;
         }
-        if (!updatedParsedXmls.contains(includeFile)){
+        if (!updatedParsedXmls.contains(includeFile)) {
             String onConflict = node.getAttribute("onConflict");
-            if (!"ignore".equalsIgnoreCase(onConflict)){
-                if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)){
-                    result.addAll(getServerXmlFeatures(includeFile, updatedParsedXmls));
-                } else if ("replace".equalsIgnoreCase(onConflict)){
-                    result = getServerXmlFeatures(includeFile, updatedParsedXmls);
+            if ("".equals(onConflict) || "merge".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (features != null) {
+                    if (result == null) {
+                        result = features;
+                    } else {
+                        result.addAll(features);
+                    }
+                }                
+            } else if ("replace".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (features != null && !features.isEmpty()) {
+                    // only replace if the child has features
+                    result = features;
                 }
+            } else if (!"ignore".equalsIgnoreCase(onConflict)) {
+                Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
+                if (result == null) {
+                    features = result;
+                } // else the parent already has some results (even if it's empty), so ignore the child
             }
         }
         return result;

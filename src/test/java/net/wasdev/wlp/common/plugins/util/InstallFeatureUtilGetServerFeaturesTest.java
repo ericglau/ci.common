@@ -251,7 +251,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     }
 
     /**
-     * Tests server.xml with IGNORE function that has no featureManager section
+     * Tests server.xml with IGNORE function when parent has no featureManager section
      * 
      * @throws Exception
      */
@@ -268,7 +268,7 @@ public class InstallFeatureUtilGetServerFeaturesTest {
     }
     
     /**
-     * Tests server.xml with IGNORE function that has empty featureManager section
+     * Tests server.xml with IGNORE function when parent has empty featureManager section
      * 
      * @throws Exception
      */
