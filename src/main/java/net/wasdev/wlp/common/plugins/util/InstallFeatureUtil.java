@@ -145,7 +145,9 @@ public abstract class InstallFeatureUtil {
     public static Set<String> combineToSet(Collection<String>... collections) {
         Set<String> result = new HashSet<String>();
         for (Collection<String> collection : collections) {
-            result.addAll(collection);
+            if (collection != null) {
+                result.addAll(collection);
+            }
         }
         return result;
     }
@@ -170,24 +172,36 @@ public abstract class InstallFeatureUtil {
     /**
      * Get the set of features defined in the server.xml
      * @param serverDirectory The server directory containing the server.xml
-     * @return the set of features that should be installed from server.xml
+     * @return the set of features that should be installed from server.xml, or empty set if nothing should be installed
      */
     public static Set<String> getServerFeatures(File serverDirectory) {
         Set<String> defaults = getConfigDropinsFeatures(serverDirectory, "defaults");
-        Set<String> result = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
-        // add the overrides at the end since they should not be replaced by other content
-        result.addAll(getConfigDropinsFeatures(serverDirectory, "overrides"));
-        return result;
+        Set<String> defaultsAndServerXmlFeatures = getServerXmlFeatures(defaults, new File(serverDirectory, "server.xml"), null);
+        // add the overrides at the end since they should not be replaced by any other content
+        Set<String> overrides = getConfigDropinsFeatures(serverDirectory, "overrides");
+        return combineToSet(defaultsAndServerXmlFeatures, overrides);
     }
     
+    /**
+     * Gets features from the configDropins's defaults or overrides directory
+     * 
+     * @param serverDirectory
+     *            The server directory
+     * @param folderName
+     *            The folder under configDropins: either "defaults" or
+     *            "overrides"
+     * @return The set of features to install, or empty set if the folder has xml
+     *         files with featureManager sections but no features to install, or
+     *         null if there are no xml files or they have no featureManager
+     *         section
+     */
     private static Set<String> getConfigDropinsFeatures(File serverDirectory, String folderName) {
-        Set<String> result = new HashSet<String>();
         File configDropinsFolder;
         try {
             configDropinsFolder = new File(new File(serverDirectory, "configDropins"), folderName).getCanonicalFile();
         } catch (IOException e) {
             // skip this directory if its path cannot be queried
-            return result;
+            return null;
         }
         File[] configDropinsXmls = configDropinsFolder.listFiles(new FilenameFilter() {
             @Override
@@ -196,11 +210,15 @@ public abstract class InstallFeatureUtil {
             }
         });
         if (configDropinsXmls == null || configDropinsXmls.length == 0) {
-            return result;
+            return null;
         }
+        Set<String> result = null;
         for (File xml : configDropinsXmls) {
             Set<String> features = getServerXmlFeatures(null, xml, null);
             if (features != null) {
+                if (result == null) {
+                    result = new HashSet<String>();
+                }
                 result.addAll(features);
             }
         }
@@ -208,11 +226,20 @@ public abstract class InstallFeatureUtil {
     }
 
     /**
+     * Adds features from the given server file into the origResult or a new set
+     * if origResult is null.
      * 
      * @param origResult
+     *            The features that have been parsed so far.
      * @param serverFile
+     *            The server XML file.
      * @param parsedXmls
-     * @return list of features from the server.xml, or empty list of it has no features, or null if the file (and all of its children) has no featureManager sections
+     *            The list of XML files that have been parsed so far.
+     * @return list of features that should be installed according to the
+     *         origResult and the current serverFile, or empty set if the file
+     *         (or its children) only has a featureManager section with no
+     *         features, or null if the file (and all of its children) has no
+     *         featureManager section
      */
     private static Set<String> getServerXmlFeatures(Set<String> origResult, File serverFile, List<File> parsedXmls) {
         Set<String> result = origResult;
@@ -250,7 +277,6 @@ public abstract class InstallFeatureUtil {
                         } else if ("include".equals(child.getNodeName())){
                             result = parseIncludeNode(result, canonicalServerFile, child, updatedParsedXmls);
                         }
-                        // TODO see if order matters
                     }
                 }
             } catch (IOException | ParserConfigurationException | SAXException e) {
@@ -261,6 +287,20 @@ public abstract class InstallFeatureUtil {
         return result;
     }
     
+    /**
+     * Parse features from an include node.
+     * 
+     * @param origResult
+     *            The features that have been parsed so far.
+     * @param serverFile
+     *            The parent server XML file containing the include node.
+     * @param node
+     *            The include node.
+     * @param updatedParsedXmls
+     *            The list of XML files that have been parsed so far.
+     * @return updated list of features that should be installed, or null if no
+     *         featureManager section had been found so far.
+     */
     private static Set<String> parseIncludeNode(Set<String> origResult, File serverFile, Element node,
             List<File> updatedParsedXmls) {
         Set<String> result = origResult;
@@ -294,10 +334,11 @@ public abstract class InstallFeatureUtil {
                     // only replace if the child has features
                     result = features;
                 }
-            } else if (!"ignore".equalsIgnoreCase(onConflict)) {
+            } else if ("ignore".equalsIgnoreCase(onConflict)) {
                 Set<String> features = getServerXmlFeatures(null, includeFile, updatedParsedXmls);
                 if (result == null) {
-                    features = result;
+                    // parent has no results (i.e. no featureManager section), so use the child's results
+                    result = features;
                 } // else the parent already has some results (even if it's empty), so ignore the child
             }
         }

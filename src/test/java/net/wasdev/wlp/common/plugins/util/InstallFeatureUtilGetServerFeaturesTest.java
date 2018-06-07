@@ -336,4 +336,54 @@ public class InstallFeatureUtilGetServerFeaturesTest {
         
         verifyServerFeatures(expected);
     }
+    
+    /**
+     * Tests server.xml with a combination of everything, but the featureManager section is after the includes
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testCombinationFeaturesAtEnd() throws Exception{
+        copyAsName("server_combination_features_at_end.xml", "server.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+        
+        // includes
+        copy("extraFeatures.xml"); // merge
+        copy("extraFeatures2.xml"); // ignore
+        copy("extraFeatures3.xml"); // replace
+        copy("extraFeatures4.xml"); // merge
+
+        // Only keep overrides, 3rd include (since it is replace), 4th include and featureManager section (since they come after)
+        Set<String> expected = new HashSet<String>();
+        expected.add("overrides");
+        expected.add("extra3");
+        expected.add("extra4");
+        expected.add("orig");
+        
+        verifyServerFeatures(expected);
+    }
+    
+    /**
+     * Tests server.xml with a recursive include
+     * 
+     * @throws Exception
+     */
+    @Test
+    public void testRecursive() throws Exception{
+        copyAsName("server_recursive.xml", "server.xml");
+        copyAsName("config_overrides.xml", "configDropins/overrides/config_overrides.xml");
+        copyAsName("config_defaults.xml", "configDropins/defaults/config_defaults.xml");
+        copy("extraFeatures.xml");
+        copy("recursiveFeatures.xml");
+
+        Set<String> expected = new HashSet<String>();
+        expected.add("defaults");
+        expected.add("overrides");
+        expected.add("orig");
+        expected.add("extra");
+        expected.add("recursive");
+        
+        verifyServerFeatures(expected);
+    }
 }
