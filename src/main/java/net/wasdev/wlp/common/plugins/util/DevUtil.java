@@ -178,10 +178,16 @@ public abstract class DevUtil {
     public abstract boolean compile(File dir);
     
     /**
-     * Restart dev mode
+     * Restart dev mode and set isRestarted() to true
      * @param executor
      */
     public abstract void restartDevMode(ThreadPoolExecutor executor);
+
+    /**
+     * Whether dev mode has been restarted
+     * @return true if dev mode has been restarted and the current process can end
+     */
+    public abstract boolean isRestarted();
 
     private List<String> jvmOptions;
 
@@ -257,10 +263,13 @@ public abstract class DevUtil {
         Runtime.getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
+                if (isRestarted()) {
+                    return;
+                }
+                
                 debug("Inside Shutdown Hook, shutting down server");
 
                 cleanUpJVMOptions();
-                cleanUpServerEnv();
 
                 if (hotkeyReader != null) {
                     hotkeyReader.shutdown();
@@ -271,6 +280,8 @@ public abstract class DevUtil {
 
                 // stopping server
                 stopServer();
+
+                cleanUpServerEnv();
             }
         });
     }
@@ -404,7 +415,7 @@ public abstract class DevUtil {
                     SensitivityWatchEventModifier.HIGH);
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
-            while (true) {
+            while (!isRestarted()) {
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()) {
                     compile(this.sourceDirectory);
