@@ -169,15 +169,16 @@ public abstract class DevUtil {
      * 
      * @param configFile
      * @param serverDir
+     * @throws PluginExecutionException if install features could not be run, and dev mode should exit
      */
-    public abstract void checkConfigFile(File configFile, File serverDir);
+    public abstract void checkConfigFile(File configFile, File serverDir) throws PluginExecutionException;
 
     /**
      * Compile the specified directory
      * @param dir
-     * @return
+     * @throws PluginExecutionException if compile could not be run, and dev mode should exit
      */
-    public abstract boolean compile(File dir);
+    public abstract void compile(File dir) throws PluginExecutionException;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -609,9 +610,10 @@ public abstract class DevUtil {
      * @param srcDir the directory of the file changed
      * @param targetFileName if not null renames the fileChanged to targetFileName in the targetDir
      * @throws IOException creating and copying to tempConfig directory
+     * @throws PluginExecutionException if install features could not be run, and dev mode should exit
      */
     public void copyConfigFolder(File fileChanged, File srcDir, String targetFileName)
-            throws IOException {
+            throws IOException, PluginExecutionException {
         this.tempConfigPath = Files.createTempDirectory("tempConfig");
         File tempConfig = tempConfigPath.toFile();
         debug("Temporary configuration folder created: " + tempConfig);
