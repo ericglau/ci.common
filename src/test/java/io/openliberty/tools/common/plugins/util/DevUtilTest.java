@@ -30,6 +30,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Files;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
@@ -88,38 +89,6 @@ public class DevUtilTest extends BaseDevUtilTest {
     }
 
     @Test
-    public void testCleanupServerEnv() throws Exception {
-        File serverEnv = new File(serverDirectory, "server.env");
-        Files.write(serverEnv.toPath(), "temp".getBytes());
-
-        assertTrue(serverEnv.exists());
-
-        util.cleanUpServerEnv();
-
-        // verify the temporary server.env file was deleted
-        assertFalse(serverEnv.exists());
-    }
-
-    @Test
-    public void testCleanupServerEnvBak() throws Exception {
-        File serverEnv = new File(serverDirectory, "server.env");
-        Files.write(serverEnv.toPath(), "temp".getBytes());
-        File serverEnvBak = new File(serverDirectory, "server.env.bak");
-        Files.write(serverEnvBak.toPath(), "backup".getBytes());
-
-        assertTrue(serverEnv.exists());
-        assertTrue(serverEnvBak.exists());
-
-        util.cleanUpServerEnv();
-
-        // verify the backup env file was restored as server.env
-        assertTrue(serverEnv.exists());
-        String serverEnvContents = new String(Files.readAllBytes(serverEnv.toPath()));
-        assertEquals(serverEnvContents, "backup");
-        assertFalse(serverEnvBak.exists());
-    }
-
-    @Test
     public void testFindAvailablePort() throws Exception {
         // prefer a port that is known to be available
         int preferredPort = getRandomPort();
@@ -155,40 +124,9 @@ public class DevUtilTest extends BaseDevUtilTest {
     @Test
     public void testEnableServerDebug() throws Exception {
         int port = getRandomPort();
-        util.enableServerDebug(port);
-        
-        File serverEnv = new File(serverDirectory, "server.env");
-        BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
-        
-        assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
-        assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
-        
-        reader.close();
-    }
-    
-    @Test
-    public void testEnableServerDebugBackup() throws Exception {
-        String serverEnvContent = "abc=123\nxyz=321";
-        
-        File serverEnv = new File(serverDirectory, "server.env");
-        serverEnv.createNewFile();
-        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnv));
-        writer.write(serverEnvContent);
-        writer.close();
-        
-        int port = getRandomPort();
-        util.enableServerDebug(port);
-        File serverEnvBackup = new File(serverDirectory, "server.env.bak");
-        assertTrue(serverEnvBackup.exists());
-        
-        BufferedReader reader = new BufferedReader(new FileReader(serverEnv));
-        
-        assertEquals("abc=123", reader.readLine());
-        assertEquals("xyz=321", reader.readLine());
-        assertEquals("WLP_DEBUG_SUSPEND=n", reader.readLine());
-        assertEquals("WLP_DEBUG_ADDRESS=" + port, reader.readLine());
-        
-        reader.close();
+        Map<String, String> map = util.getDebugEnvironmentVariables(port);
+        assertEquals("n", map.get("WLP_DEBUG_SUSPEND"));
+        assertEquals(String.valueOf(port), map.get("WLP_DEBUG_ADDRESS"));
     }
 
     @Test

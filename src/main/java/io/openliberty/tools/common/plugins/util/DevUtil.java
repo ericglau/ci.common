@@ -52,6 +52,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -535,30 +536,6 @@ public abstract class DevUtil {
         return null;
     }
     
-    public void cleanUpServerEnv() {
-        // clean up server.env file
-        File serverEnvFile;
-        File serverEnvBackup;
-        try {
-            serverEnvBackup = new File(serverDirectory.getCanonicalPath() + "/server.env.bak");
-            serverEnvFile = new File(serverDirectory.getCanonicalPath() + "/server.env");
-            if (serverEnvBackup.exists()) {
-                // Restore original server.env file
-                try {
-                    Files.copy(serverEnvBackup.toPath(), serverEnvFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
-                    error("Could not restore server.env: " + e.getMessage());
-                }
-                serverEnvBackup.delete();
-            } else {
-                // Delete server.env file
-                serverEnvFile.delete();
-            }
-        } catch (IOException e) {
-            error("Could not retrieve server.env: " + e.getMessage());
-        }
-    }
-    
     public void cleanUpTempConfig() {
         if (this.tempConfigPath != null){
             File tempConfig = this.tempConfigPath.toFile();
@@ -585,7 +562,6 @@ public abstract class DevUtil {
                 debug("Inside Shutdown Hook, shutting down server");
                 
                 cleanUpTempConfig();
-                cleanUpServerEnv();
                 setDevStop(true);
 
                 if (hotkeyReader != null) {
@@ -601,48 +577,16 @@ public abstract class DevUtil {
         });
     }
 
-    public void enableServerDebug(int libertyDebugPort) throws IOException {
-        String serverEnvPath = serverDirectory.getCanonicalPath() + "/server.env";
-        File serverEnvFile = new File(serverEnvPath);
-        StringBuilder sb = new StringBuilder();
-        if (serverEnvFile.exists()) {
-            debug("server.env already exists");
-            File serverEnvBackup = new File(serverEnvPath + ".bak");
-            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
-            boolean deleted = serverEnvFile.delete();
-
-            if (!deleted) {
-                error("Could not move existing liberty:dev server.env file");
-            }
-
-            BufferedReader reader = new BufferedReader(new FileReader(serverEnvBackup));
-            try {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                    sb.append("\n");
-                }
-            } finally {
-                reader.close();
-            }
-        }
-        
-        debug("Creating server.env file: " + serverEnvFile.getCanonicalPath());
-        sb.append("WLP_DEBUG_SUSPEND=n\n");
-        sb.append("WLP_DEBUG_ADDRESS=");
-        sb.append(findAvailablePort(libertyDebugPort));
-        sb.append("\n");
-
-        BufferedWriter writer = new BufferedWriter(new FileWriter(serverEnvFile));
-        try {
-            writer.write(sb.toString());
-        } finally {
-            writer.close();
-        }
-
-        if (serverEnvFile.exists()) {
-            info("Successfully created liberty:dev server.env file");
-        }
+    /**
+     * Gets a map of the environment variables to set for debug mode.
+     * 
+     * @param libertyDebugPort the debug port to use
+     */
+    public Map<String, String> getDebugEnvironmentVariables(int libertyDebugPort) throws IOException {
+        Map<String, String> map = new HashMap<String, String>();
+        map.put("WLP_DEBUG_SUSPEND", "n");
+        map.put("WLP_DEBUG_ADDRESS", String.valueOf(findAvailablePort(libertyDebugPort)));
+        return map;
     }
 
     /**
