@@ -608,7 +608,7 @@ public abstract class DevUtil {
         if (serverEnvFile.exists()) {
             debug("server.env already exists");
             File serverEnvBackup = new File(serverEnvPath + ".bak");
-            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath());
+            Files.copy(serverEnvFile.toPath(), serverEnvBackup.toPath(), StandardCopyOption.REPLACE_EXISTING);
             boolean deleted = serverEnvFile.delete();
 
             if (!deleted) {
