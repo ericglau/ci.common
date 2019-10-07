@@ -168,9 +168,10 @@ public abstract class DevUtil {
      * @param buildFile
      * @param artifactPaths
      * @param executor      The thread pool executor
+     * @throws PluginExecutionException if there was an error when restarting the server
      * @return true if the build file was recompiled with changes
      */
-    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor);
+    public abstract boolean recompileBuildFile(File buildFile, List<String> artifactPaths, ThreadPoolExecutor executor) throws PluginExecutionException;
 
     /**
      * Run the unit tests
@@ -453,7 +454,8 @@ public abstract class DevUtil {
             if (serverStartTimeout < 0) {
                 serverStartTimeout = 30;
             }
-            serverTask.setTimeout(Long.toString(serverStartTimeout * 1000));
+            long serverStartTimeoutMillis = serverStartTimeout * 1000;
+            serverTask.setTimeout(Long.toString(serverStartTimeoutMillis));
 
             // Watch logs directory if it already exists
             WatchService watchService = FileSystems.getDefault().newWatchService();
@@ -509,16 +511,31 @@ public abstract class DevUtil {
         }
     }
 
+    public abstract void libertyCreate() throws PluginExecutionException;
+    public abstract void libertyDeploy() throws PluginExecutionException;
+    public abstract void libertyInstallFeature() throws PluginExecutionException;
+
     public void restartServer() throws PluginExecutionException {
         info("Restarting server...");
         setDevStop(true);
         stopServer();
-        try {
-            serverThread.join(3000);
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            error(e.getMessage());
+        if (serverThread != null) {
+            try {
+                serverThread.join(3000);
+                if (serverThread.isAlive()) {
+                    throw new PluginExecutionException("Could not stop the server");
+                }    
+            } catch (InterruptedException e) {
+                if (serverThread.isAlive()) {
+                    throw new PluginExecutionException("Could not stop the server", e);
+                } else {
+                    debug(e);
+                }
+            }
         }
+        libertyCreate();
+        libertyInstallFeature();
+        libertyDeploy();
         startServer();
         setDevStop(false);
         info("Server has been restarted.");
@@ -643,6 +660,12 @@ public abstract class DevUtil {
         }
     }
     
+    /**
+     * Whether dev mode intentionally caused the server to stop.
+     * 
+     * @param devStop If true, stopping the server will not cause dev mode to print
+     *                an error message.
+     */
     public void setDevStop(boolean devStop) {
         this.devStop.set(devStop);
     }

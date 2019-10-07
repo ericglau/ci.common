@@ -147,6 +147,21 @@ public class BaseDevUtilTest {
         public void runIntegrationTests() throws PluginScenarioException, PluginExecutionException {
             // not needed for tests
         }
+
+        @Override
+        public void libertyCreate() {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyDeploy() {
+            // not needed for tests
+        }
+
+        @Override
+        public void libertyInstallFeature() {
+            // not needed for tests
+        }
         
     }
     
