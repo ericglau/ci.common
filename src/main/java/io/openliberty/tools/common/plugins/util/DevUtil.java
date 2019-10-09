@@ -446,6 +446,9 @@ public abstract class DevUtil {
     public void startServer() throws PluginExecutionException {
         try {
             final ServerTask serverTask = getServerTask();
+            
+            // Set debug variables in server.env
+            enableServerDebug();
 
             String logsDirectory = serverTask.getOutputDir() + "/" + serverTask.getServerName() + "/logs";
             File messagesLogFile = new File(logsDirectory + "/messages.log");
