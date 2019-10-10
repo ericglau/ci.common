@@ -412,31 +412,6 @@ public abstract class DevUtil {
         return messageOccurrences;
     }
 
-    class ServerRunnable implements Runnable {
-        private final ServerTask serverTask;
-        public final AtomicBoolean failed = new AtomicBoolean(false);
-
-        public ServerRunnable(ServerTask serverTask) {
-            this.serverTask = serverTask;
-        }
-
-        @Override
-        public void run() {
-            try {
-                serverTask.execute();
-            } catch (Exception e) {
-                /*
-                 * long serverStartTimeout = Long.parseLong(serverTask.getTimeout());
-                 * debug("Error starting server after " + (serverStartTimeout / 1000) +
-                 * " seconds. Consider increasing the serverStartTimeout value if this continues to occur."
-                 * , e);
-                 */
-                error("Error starting server", e);
-                failed.set(true);
-            }
-        }
-    }
-
     /**
      * Start the server and keep it running in a background thread.
      * 
