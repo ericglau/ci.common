@@ -541,7 +541,7 @@ public abstract class DevUtil {
         libertyDeploy();
         startServer();
         setDevStop(false);
-        info("Server has been restarted.");
+        info("The server has been restarted.");
     }
 
     private void parseHostNameAndPorts(final ServerTask serverTask, File messagesLogFile) throws PluginExecutionException {
