@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionException;
@@ -72,9 +73,9 @@ import javax.tools.ToolProvider;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
 
-import io.openliberty.tools.ant.ServerTask;
-
 import org.apache.commons.io.FileUtils;
+
+import io.openliberty.tools.ant.ServerTask;
 
 /**
  * Utility class for dev mode.
@@ -219,6 +220,11 @@ public abstract class DevUtil {
      * @throws Exception if there was an error copying/creating config files
      */
     public abstract ServerTask getServerTask() throws Exception;
+    
+    /**
+     * Redeploy the application
+     */
+    public abstract void redeployApp() throws PluginExecutionException;
 
     private File serverDirectory;
     private File sourceDirectory;
@@ -453,9 +459,12 @@ public abstract class DevUtil {
                     try {
                         serverTask.execute();
                     } catch (RuntimeException e) {
-                        // If a runtime exception occurred in the server task, log and rethrow
-                        error("An error occurred while starting the server: " + e.getMessage(), e);
-                        throw e;
+                        // If devStop is true server was stopped with Ctl-c, do not throw exception
+                        if (devStop.get() == false) {
+                            // If a runtime exception occurred in the server task, log and rethrow
+                            error("An error occurred while starting the server: " + e.getMessage(), e);
+                            throw e;
+                        }
                     }
                 }
 
@@ -497,7 +506,7 @@ public abstract class DevUtil {
             if (startMessage == null) {
                 setDevStop(true);
                 stopServer();
-                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeoutMillis
+                throw new PluginExecutionException("Unable to verify if the server was started after " + serverStartTimeout
                         + " seconds.  Consider increasing the serverStartTimeout value if this continues to occur.");
             }
 
@@ -680,9 +689,9 @@ public abstract class DevUtil {
             public void run() {
                 debug("Inside Shutdown Hook, shutting down server");
                 
+                setDevStop(true);
                 cleanUpTempConfig();
                 cleanUpServerEnv();
-                setDevStop(true);
 
                 if (hotkeyReader != null) {
                     hotkeyReader.shutdown();
@@ -1069,7 +1078,7 @@ public abstract class DevUtil {
                         registerAll(configPath, watcher);
                         debug("Registering configuration directory: " + this.configDirectory);
                     } else {
-                        info("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
+                        warn("The server configuration directory " + configDirectory + " has been added. Restart liberty:dev mode for it to take effect.");
                     }
                 }
                 
@@ -1077,7 +1086,7 @@ public abstract class DevUtil {
                 if (!serverXmlFileRegistered && serverXmlFile != null && serverXmlFile.exists()){
                     serverXmlFileRegistered = true;
                     debug("Server configuration file has been added: " + serverXmlFile);
-                    info("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
+                    warn("The server configuration file " + serverXmlFile + " has been added. Restart liberty:dev mode for it to take effect.");
                 }
                 
                 // check if resourceDirectory has been added
@@ -1163,6 +1172,9 @@ public abstract class DevUtil {
                                     || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) {
                                 copyConfigFolder(fileChanged, configDirectory, null);
                                 copyFile(fileChanged, configDirectory, serverDirectory, null);
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 if (fileChanged.getName().equals("server.env")) {
                                     // re-enable debug variables in server.env
                                     enableServerDebug(false);
@@ -1184,7 +1196,9 @@ public abstract class DevUtil {
                                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                                 copyFile(fileChanged, serverXmlFileParent, serverDirectory,
                                         "server.xml");
-
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                    redeployApp();
+                                }
                                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
                             } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE
@@ -1524,9 +1538,14 @@ public abstract class DevUtil {
             
             // source root is src/main/java or src/test/java
             File classesDir = tests ? testOutputDirectory : outputDirectory;
-
-            if (!classesDir.exists() && !classesDir.mkdirs()) {
-                throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath() + " does not exist and cannot be created.");
+            if (!classesDir.exists()) {
+                if (!classesDir.mkdirs()) {
+                    throw new PluginExecutionException("The classes output directory " + classesDir.getAbsolutePath()
+                            + " does not exist and cannot be created.");
+                } else if (classesDir.exists() && Objects.equals(classesDir.getCanonicalFile(), outputDirectory.getCanonicalFile())) {
+                    // redeploy application when class directory has been created
+                    redeployApp();
+                }
             }
 
             List<String> optionList = new ArrayList<>();

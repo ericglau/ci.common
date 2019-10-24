@@ -25,9 +25,6 @@ import org.junit.Rule;
 import org.junit.rules.TemporaryFolder;
 
 import io.openliberty.tools.ant.ServerTask;
-import io.openliberty.tools.common.plugins.util.DevUtil;
-import io.openliberty.tools.common.plugins.util.PluginExecutionException;
-import io.openliberty.tools.common.plugins.util.PluginScenarioException;
 
 public class BaseDevUtilTest {
     
@@ -160,6 +157,11 @@ public class BaseDevUtilTest {
 
         @Override
         public void libertyInstallFeature() {
+            // not needed for tests
+        }
+
+        @Override
+        public void redeployApp() throws PluginExecutionException {
             // not needed for tests
         }
         
