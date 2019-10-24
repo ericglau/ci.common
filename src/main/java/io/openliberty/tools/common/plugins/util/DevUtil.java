@@ -532,15 +532,17 @@ public abstract class DevUtil {
         setDevStop(true);
         stopServer();
         if (serverThread != null) {
+            final long threadShutdownTimeoutSeconds = 30;
             try {
-                serverThread.join(3000);
+                serverThread.join(threadShutdownTimeoutSeconds * 1000);
                 if (serverThread.isAlive()) {
-                    throw new PluginExecutionException("Could not stop the server");
-                }    
+                    throw new PluginExecutionException("Could not stop the server after " + threadShutdownTimeoutSeconds + " seconds.  Ensure that the server has been stopped, then start dev mode again.");
+                }
             } catch (InterruptedException e) {
                 if (serverThread.isAlive()) {
-                    throw new PluginExecutionException("Could not stop the server", e);
+                    throw new PluginExecutionException("Could not stop the server.  Ensure that the server has been stopped, then start dev mode again.", e);
                 } else {
+                    // the thread was interrupted, but the server thread is already stopped
                     debug(e);
                 }
             }
