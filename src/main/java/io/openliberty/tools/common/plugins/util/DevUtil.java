@@ -1131,9 +1131,9 @@ public abstract class DevUtil {
                             if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
                                 registerAll(fileChanged.toPath(), watcher);
                             }
-                            // otherwise if a directory was modified, just ignore
+                            // otherwise if a directory was modified, just continue to the next entry
                             // (if delete, can't tell if it was a directory since it doesn't exist anymore)
-                            break;
+                            continue;
                         }
                         
                         int numApplicationUpdatedMessages = countApplicationUpdatedMessages();
@@ -1428,7 +1428,6 @@ public abstract class DevUtil {
      * Register the parent directory and all sub-directories with the WatchService
      * 
      * @param start parent directory
-     * @param dir path of parent directory
      * @param watcher WatchService
      * @throws IOException unable to walk through file tree 
      */
