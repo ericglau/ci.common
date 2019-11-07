@@ -251,6 +251,7 @@ public abstract class DevUtil {
     private int libertyDebugPort;
     private AtomicBoolean detectedAppStarted;
     private long serverStartTimeout;
+    private boolean useMavenOrGradleCompile = false;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -1575,7 +1576,8 @@ public abstract class DevUtil {
             }
             JavaCompiler.CompilationTask task = compiler.getTask(null, fileManager, null, optionList, null,
                     compilationUnits);
-            boolean didCompile = task.call();
+
+            boolean didCompile = useMavenOrGradleCompile ? compile(tests ? testSourceDirectory : sourceDirectory) : task.call();
             if (didCompile) {
                 if (tests) {
                     info("Tests compilation was successful.");
@@ -1601,6 +1603,10 @@ public abstract class DevUtil {
         } catch (Exception e) {
             debug("Error compiling java files", e);
         }
+    }
+
+    public void setUseMavenOrGradleCompile(boolean useMavenOrGradleCompile) {
+        this.useMavenOrGradleCompile = useMavenOrGradleCompile;
     }
 
     /**
