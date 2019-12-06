@@ -998,6 +998,16 @@ public abstract class DevUtil {
                     SensitivityWatchEventModifier.HIGH);
             debug("Watching build file directory: " + buildFile.getParentFile().toPath());
 
+            if (propertyFilesMap != null) {
+                for (File f : propertyFilesMap.keySet()) {
+                    f.getParentFile().toPath().register(
+                        watcher, new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                                StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                        SensitivityWatchEventModifier.HIGH);
+                    info("Watching property file directory: " + f.getParentFile().toPath());
+                }
+            }
+
             Collection<File> recompileJavaSources = new HashSet<File>();
             Collection<File> recompileJavaTests = new HashSet<File>();
             Collection<File> deleteJavaSources = new HashSet<File>();
@@ -1290,15 +1300,15 @@ public abstract class DevUtil {
                                         }
                                         runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
                                     }
-                        } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)
-                                && (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY
-                                    || event.kind() == StandardWatchEventKinds.ENTRY_CREATE)) { // properties file
-
-                                    boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
-                                    // run all tests on properties file change
-                                    if (reloadedPropertyFile) {
-                                        runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
-                                    }
+                        } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
+                            info("Property file changed: " + fileChanged);
+                            //if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY || event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
+                                boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
+                                // run all tests on properties file change
+                                if (reloadedPropertyFile) {
+                                    runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                                }
+                        //    }
                         }
                     }
                     // reset the key
@@ -1875,15 +1885,19 @@ public abstract class DevUtil {
      * @return true if the property file was reloaded with changes
      */
     private boolean reloadPropertyFile(File propertyFile) throws PluginExecutionException {
+        if (!propertyFile.exists() && propertyFilesMap.get(propertyFile) != null) {
+            // property file deleted, so clear properties from map
+            propertyFilesMap.put(propertyFile, null);
+        }
         try (InputStream inputStream = new FileInputStream(propertyFile)) {
             Properties properties = new Properties();
             properties.load(inputStream);
             if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
-                debug("Properties in " + propertyFile.getAbsolutePath() + " have changed. Restarting server...");
+                info("Properties in " + propertyFile.getAbsolutePath() + " have changed. Restarting server...");
                 restartServer();
                 return true;
             } else {
-                debug("No changes detected in properties file " + propertyFile.getAbsolutePath());
+                info("No changes detected in properties file " + propertyFile.getAbsolutePath());
                 return false;
             }
         } catch (IOException e) {
@@ -1908,6 +1922,7 @@ public abstract class DevUtil {
             propertyFilesMap = new HashMap<File, Properties>(propertyFiles.size());
         }
         for (File f : propertyFiles) {
+            info("Loading file " + f);
             if (!f.exists()) {
                 continue;
             }
@@ -1915,6 +1930,7 @@ public abstract class DevUtil {
                 Properties properties = new Properties();
                 properties.load(inputStream);
                 propertyFilesMap.put(f, properties);
+                info("Loaded file! " + properties);
             } catch (IOException e) {
                 error("Could not read properties file " + f.getAbsolutePath(), e);
             }
