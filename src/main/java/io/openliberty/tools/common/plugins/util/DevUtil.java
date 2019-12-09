@@ -1894,6 +1894,7 @@ public abstract class DevUtil {
             properties.load(inputStream);
             if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
                 info("Properties in " + propertyFile.getAbsolutePath() + " have changed. Restarting server...");
+                propertyFilesMap.put(propertyFile, properties);
                 restartServer();
                 return true;
             } else {
