@@ -1169,14 +1169,14 @@ public abstract class DevUtil {
 
                     for (WatchEvent<?> event : events) {
                         final Path changed = (Path) event.context();
-                        debug("Processing events for watched directory: " + directory);
+                        info("Processing events for watched directory: " + directory);
 
                         File fileChanged = new File(directory.toString(), changed.toString());
                         if (ignoreFileOrDir(fileChanged)) {
                             // skip this file or directory, and continue to the next file or directory
                             continue;
                         }
-                        debug("Changed: " + changed + "; " + event.kind());
+                        info("Changed: " + changed + "; " + event.kind());
 
                         // resource file check
                         File resourceParent = null;
@@ -1302,13 +1302,11 @@ public abstract class DevUtil {
                                     }
                         } else if (propertyFilesMap != null && propertyFilesMap.keySet().contains(fileChanged)) { // properties file
                             info("Property file changed: " + fileChanged);
-                            //if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY || event.kind() == StandardWatchEventKinds.ENTRY_CREATE) {
-                                boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
-                                // run all tests on properties file change
-                                if (reloadedPropertyFile) {
-                                    runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
-                                }
-                        //    }
+                            boolean reloadedPropertyFile = reloadPropertyFile(fileChanged);
+                            // run all tests on properties file change
+                            if (reloadedPropertyFile) {
+                                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+                            }
                         }
                     }
                     // reset the key
@@ -1885,16 +1883,17 @@ public abstract class DevUtil {
      * @return true if the property file was reloaded with changes
      */
     private boolean reloadPropertyFile(File propertyFile) throws PluginExecutionException {
-        if (!propertyFile.exists() && propertyFilesMap.get(propertyFile) != null) {
-            // property file deleted, so clear properties from map
-            propertyFilesMap.put(propertyFile, null);
-        }
-        try (InputStream inputStream = new FileInputStream(propertyFile)) {
-            Properties properties = new Properties();
-            properties.load(inputStream);
+        InputStream inputStream = null;
+        Properties properties = null;
+        try {
+            if (propertyFile.exists()) {
+                inputStream = new FileInputStream(propertyFile);
+                properties = new Properties();
+                properties.load(inputStream);
+            }
             if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
-                info("Properties in " + propertyFile.getAbsolutePath() + " have changed. Restarting server...");
-                propertyFilesMap.put(propertyFile, properties);
+                info("Properties file " + propertyFile.getAbsolutePath() + " has changed. Restarting server...");
+                propertyFilesMap.put(propertyFile, properties);    
                 restartServer();
                 return true;
             } else {
@@ -1903,6 +1902,14 @@ public abstract class DevUtil {
             }
         } catch (IOException e) {
             error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    // nothing to do
+                }
+            }
         }
         return false;
     }
