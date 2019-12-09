@@ -1929,20 +1929,32 @@ public abstract class DevUtil {
         if (propertyFilesMap == null) {
             propertyFilesMap = new HashMap<File, Properties>(propertyFiles.size());
         }
-        for (File f : propertyFiles) {
-            info("Loading file " + f);
-            if (!f.exists()) {
-                continue;
-            }
-            try (InputStream inputStream = new FileInputStream(f)) {
-                Properties properties = new Properties();
-                properties.load(inputStream);
-                propertyFilesMap.put(f, properties);
+        for (File propertyFile : propertyFiles) {
+            info("Loading file " + propertyFile);
+            InputStream inputStream = null;
+            Properties properties = null;
+            try {
+                if (propertyFile.exists()) {
+                    inputStream = new FileInputStream(propertyFile);
+                    properties = new Properties();
+                    properties.load(inputStream);
+                }
+                propertyFilesMap.put(propertyFile, properties);
                 info("Loaded file! " + properties);
             } catch (IOException e) {
-                error("Could not read properties file " + f.getAbsolutePath(), e);
+                error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
+            } finally {
+                if (inputStream != null) {
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        // nothing to do
+                    }
+                }
             }
         }
     }
+
+    
 
 }
