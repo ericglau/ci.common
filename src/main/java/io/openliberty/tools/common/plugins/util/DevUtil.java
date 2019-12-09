@@ -1883,35 +1883,16 @@ public abstract class DevUtil {
      * @return true if the property file was reloaded with changes
      */
     private boolean reloadPropertyFile(File propertyFile) throws PluginExecutionException {
-        InputStream inputStream = null;
-        Properties properties = null;
-        try {
-            if (propertyFile.exists()) {
-                inputStream = new FileInputStream(propertyFile);
-                properties = new Properties();
-                properties.load(inputStream);
-            }
-            if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
-                info("Properties file " + propertyFile.getAbsolutePath() + " has changed. Restarting server...");
-                propertyFilesMap.put(propertyFile, properties);    
-                restartServer();
-                return true;
-            } else {
-                info("No changes detected in properties file " + propertyFile.getAbsolutePath());
-                return false;
-            }
-        } catch (IOException e) {
-            error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
-        } finally {
-            if (inputStream != null) {
-                try {
-                    inputStream.close();
-                } catch (IOException e) {
-                    // nothing to do
-                }
-            }
+        Properties properties = readPropertiesFromFile(propertyFile);
+        if (!Objects.equals(properties, propertyFilesMap.get(propertyFile))) {
+            info("Properties file " + propertyFile.getAbsolutePath() + " has changed. Restarting server...");
+            propertyFilesMap.put(propertyFile, properties);    
+            restartServer();
+            return true;
+        } else {
+            info("No changes detected in properties file " + propertyFile.getAbsolutePath());
+            return false;
         }
-        return false;
     }
 
     /**
@@ -1931,30 +1912,36 @@ public abstract class DevUtil {
         }
         for (File propertyFile : propertyFiles) {
             info("Loading file " + propertyFile);
-            InputStream inputStream = null;
-            Properties properties = null;
-            try {
-                if (propertyFile.exists()) {
-                    inputStream = new FileInputStream(propertyFile);
-                    properties = new Properties();
-                    properties.load(inputStream);
-                }
-                propertyFilesMap.put(propertyFile, properties);
-                info("Loaded file! " + properties);
-            } catch (IOException e) {
-                error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
-            } finally {
-                if (inputStream != null) {
-                    try {
-                        inputStream.close();
-                    } catch (IOException e) {
-                        // nothing to do
-                    }
-                }
-            }
+            Properties properties = readPropertiesFromFile(propertyFile);
+            propertyFilesMap.put(propertyFile, properties);
+            info("Loaded file! " + properties);
         }
     }
 
-    
+    /**
+     * Read properties from file.  If file does not exist or an IO exception occurred, returns null.
+     */
+    private Properties readPropertiesFromFile(File propertyFile) {
+        InputStream inputStream = null;
+        Properties properties = null;
+        try {
+            if (propertyFile.exists()) {
+                inputStream = new FileInputStream(propertyFile);
+                properties = new Properties();
+                properties.load(inputStream);
+            }
+        } catch (IOException e) {
+            error("Could not read properties file " + propertyFile.getAbsolutePath(), e);
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    // nothing to do
+                }
+            }
+        }
+        return properties;
+    }
 
 }
