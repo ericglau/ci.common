@@ -473,16 +473,29 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
     }
     
     private Map<String, Object> createMapBasedInstallKernelInstance(File installDirectory) throws PrivilegedActionException, PluginExecutionException {
-        Map<String, Object> mapBasedInstallKernel = AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
-            @SuppressWarnings({ "unchecked", "resource" })
-            @Override
-            public Map<String, Object> run() throws Exception {
-                ClassLoader loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, getClass().getClassLoader());
-                Class<Map<String, Object>> clazz;
-                clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
-                return clazz.newInstance();
+        final URLClassLoader loader = null;
+
+        Map<String, Object> mapBasedInstallKernel = null;
+        try {
+            AccessController.doPrivileged(new PrivilegedExceptionAction<Map<String, Object>>() {
+                @SuppressWarnings({ "unchecked" })
+                @Override
+                public Map<String, Object> run() throws Exception {
+                    loader = new URLClassLoader(new URL[] { installJarFile.toURI().toURL() }, getClass().getClassLoader());
+                    Class<Map<String, Object>> clazz;
+                    clazz = (Class<Map<String, Object>>) loader.loadClass("com.ibm.ws.install.map.InstallMap");
+                    return clazz.newInstance();
+                }
+            });
+        } finally {
+            if (loader != null) {
+                try {
+                    loader.close();
+                } catch (IOException e) {
+                    // nothing to do
+                }
             }
-        });
+        }
         if (mapBasedInstallKernel == null){
             throw new PluginExecutionException("Cannot run install jar file " + installJarFile);
         }
