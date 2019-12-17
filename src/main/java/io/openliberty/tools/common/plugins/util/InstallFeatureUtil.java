@@ -432,10 +432,10 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
         } catch (MalformedURLException e) {
             throw new PluginExecutionException("Could not resolve URL from file " + installJarFile, e);
         }
-        final URLClassLoader loader = new URLClassLoader(new URL[] { installJarURL }, getClass().getClassLoader());
+        Map<String, Object> mapBasedInstallKernel = null;
 
-        try {
-            Map<String, Object> mapBasedInstallKernel = createMapBasedInstallKernelInstance(loader, installDirectory);
+        try (final URLClassLoader loader = new URLClassLoader(new URL[] { installJarURL }, getClass().getClassLoader())) {
+            mapBasedInstallKernel = createMapBasedInstallKernelInstance(loader, installDirectory);
             mapBasedInstallKernel.put("install.local.esa", true);
             mapBasedInstallKernel.put("single.json.file", jsonRepos);
             mapBasedInstallKernel.put("features.to.resolve", featuresToInstall);
@@ -495,13 +495,15 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             info("The following features have been installed: " + installedFeaturesBuilder.toString());
         } catch (PrivilegedActionException e) {
             throw new PluginExecutionException("Could not load the jar " + installJarFile.getAbsolutePath(), e);
+        } catch (IOException e) {
+            throw new PluginExecutionException("Could not close the jar " + installJarFile.getAbsolutePath() + " after installing features.", e);
         } finally {
-            if (loader != null) {
+            if (mapBasedInstallKernel != null) {
                 try {
-                    loader.close();
-                } catch (IOException e) {
-                    // nothing to do
-                }
+                    mapBasedInstallKernel.clear();
+                } catch (RuntimeException e) {
+                    throw new PluginExecutionException("Could not close resources after installing features.", e);
+                }    
             }
         }
     }
