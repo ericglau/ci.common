@@ -501,9 +501,11 @@ public abstract class InstallFeatureUtil extends ServerFeatureUtil {
             if (mapBasedInstallKernel != null) {
                 try {
                     mapBasedInstallKernel.clear();
+                } catch (UnsupportedOperationException e) {
+                    debug("This version of the install map does not support the clear operation.", e);
                 } catch (RuntimeException e) {
                     throw new PluginExecutionException("Could not close resources after installing features.", e);
-                }    
+                }
             }
         }
     }
