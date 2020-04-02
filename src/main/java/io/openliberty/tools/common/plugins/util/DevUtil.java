@@ -241,6 +241,13 @@ public abstract class DevUtil {
      */
     public abstract String getServerStartTimeoutExample();
 
+    /**
+     * Do an incremental rebuild of the project using Maven or Gradle.
+     * 
+     * @return true if the rebuild was successful
+     */
+    public abstract void rebuildProject() throws PluginExecutionException;
+
     private File serverDirectory;
     private File sourceDirectory;
     private File testSourceDirectory;
@@ -274,12 +281,13 @@ public abstract class DevUtil {
     private boolean gradle;
     private boolean polling;
     private long pollingInterval;
+    private final boolean fullBuild;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean polling,
-            long pollingInterval) {
+            long pollingInterval, boolean fullBuild) {
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
         this.testSourceDirectory = testSourceDirectory;
@@ -304,6 +312,7 @@ public abstract class DevUtil {
         this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.polling = polling;
+        this.fullBuild = fullBuild;
 
         if (polling && pollingInterval < 0) {
             warn("The pollingInterval value needs to be an integer greater than or equal to 0.  The default value of 100 milliseconds will be used.");
@@ -1168,11 +1177,14 @@ public abstract class DevUtil {
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
                         && this.sourceDirectory.listFiles().length > 0) {
-                    compile(this.sourceDirectory);
+                    if (!fullBuild) {
+                        compile(this.sourceDirectory);
+                    } // else, it has already been compiled in processJavaCompilation
                     registerAll(srcPath, executor, watcher);
                     debug("Registering Java source directory: " + this.sourceDirectory);
                     sourceDirRegistered = true;
                 } else if (sourceDirRegistered && !this.sourceDirectory.exists()) {
+                    // TODO does fullBuild still need target dir to be cleaned?
                     cleanTargetDir(outputDirectory);
                     sourceDirRegistered = false;
                 }
@@ -1180,13 +1192,16 @@ public abstract class DevUtil {
                 // check if testSourceDirectory has been added
                 if (!testSourceDirRegistered && this.testSourceDirectory.exists()
                         && this.testSourceDirectory.listFiles().length > 0) {
-                    compile(this.testSourceDirectory);
+                    if (!fullBuild) {
+                        compile(this.testSourceDirectory);
+                    } // else, it has already been compiled in processJavaCompilation
                     registerAll(testSrcPath, executor, watcher);
                     debug("Registering Java test directory: " + this.testSourceDirectory);
                     runTestThread(false, executor, -1, false, false);
                     testSourceDirRegistered = true;
 
                 } else if (testSourceDirRegistered && !this.testSourceDirectory.exists()) {
+                    // TODO does fullBuild still need target dir to be cleaned?
                     cleanTargetDir(testOutputDirectory);
                     testSourceDirRegistered = false;
                 }
@@ -1457,6 +1472,13 @@ public abstract class DevUtil {
                         failedCompilationJavaTests.addAll(recompileJavaTests);
                     }
                 }
+            }
+
+            if (!deleteJavaSources.isEmpty() || !recompileJavaSources.isEmpty()) {
+                if (fullBuild) { // TODO check if loose app
+                    // rebuild the entire project archive
+                    rebuildProject();
+                }   
             }
 
             // run tests if files were deleted without any other changes, since
