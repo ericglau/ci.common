@@ -284,10 +284,10 @@ public abstract class DevUtil {
     private long pollingInterval;
     private FileTrackMode trackingMode;
     private final boolean container;
-    private String containerID = null;
     private String imageName;
     private File dockerfile;
     private String dockerRunOpts;
+    private volatile Process dockerRunProcess;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -673,26 +673,39 @@ public abstract class DevUtil {
 
     private void startContainer() {
         try {
-            containerID = execDockerCmd(getContainerCommand(), 30);
-            info("docker container: " + containerID);
-        } catch (RuntimeException r) {
-            error("Error starting container: " + r.getMessage());
-            throw r;
+            String startContainerCommand = getContainerCommand();
+            debug("startContainer, cmd="+startContainerCommand);
+            dockerRunProcess = Runtime.getRuntime().exec(startContainerCommand);
+            dockerRunProcess.waitFor();
+            if (dockerRunProcess.exitValue() != 0) {
+                debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
+                // read messages from standard err
+                char[] d = new char[1023];
+                new InputStreamReader(dockerRunProcess.getErrorStream()).read(d);
+                String errorMessage = new String(d).trim() + " RC=" + dockerRunProcess.exitValue();
+                throw new RuntimeException(errorMessage);
+            }
+            info("EXITED process successfully");
+        } catch (IOException e) {
+            error("Error starting container: " + e.getMessage());
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            error("Docker container thread was interrupted: " + e.getMessage());
         }
     }
 
     private void stopContainer() {
         try {
-            info("stopping docker container: " + containerID);
-            if (containerID != null) {
-                String s = execDockerCmd("docker stop " + containerID, 30);
+            info("stopping docker container on process: " + dockerRunProcess);
+            if (dockerRunProcess != null) {
+                dockerRunProcess.destroy();
+                dockerRunProcess.waitFor();
+                //String s = execDockerCmd("docker stop " + containerID, 30);
             }
-        } catch (RuntimeException r) {
-            error("Error stopping container: " + r.getMessage());
-            throw r;
-
+        } catch (InterruptedException e) {
+            error("Docker container thread was interrupted: " + e.getMessage());
         } finally {
-            containerID = null;
+            dockerRunProcess = null;
         }
     }
 
@@ -746,7 +759,7 @@ public abstract class DevUtil {
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
-        StringBuffer command = new StringBuffer("docker run -d --rm");
+        StringBuffer command = new StringBuffer("docker run --rm");
         if (httpPort != null) {
             command.append(" -p "+httpPort+":"+httpPort);
         } else {
@@ -1731,7 +1744,7 @@ public abstract class DevUtil {
  
     private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if ((containerID == null || containerID.isEmpty()) &&
+        if ((dockerRunProcess == null) &&
             (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
             if (!this.devStop.get()) {
                 // server was stopped outside of dev mode
