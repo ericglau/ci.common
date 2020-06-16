@@ -541,6 +541,10 @@ public abstract class DevUtil {
 
                         if (container) {
                             startContainer();
+                            // if (containerID != null) {
+                            //     // display docker logs continuously in this thread
+                            //     runDockerLogs();
+                            // }
                         } else {
                             serverTask.execute();
                         }
@@ -696,8 +700,20 @@ public abstract class DevUtil {
         }
     }
 
+    private void runDockerLogs() {
+        try {
+            info("Getting Docker logs for container " + containerID + "...");
+            String dockerLogsCmd = "docker logs " + containerID + " -f";
+            String result = execDockerCmd(dockerLogsCmd, -1);
+            info("docker logs command result: " + result);
+        } catch (RuntimeException r) {
+            error("Error running docker logs command: " + r.getMessage());
+            throw r;
+        }
+    }
+
     /**
-     * @param timeout unit is seconds
+     * @param timeout unit is seconds.  If negative, the command runs without timing out.
      * @return the stdout of the command or null for no output on stdout
      */
     private String execDockerCmd(String command, int timeout) {
@@ -705,7 +721,11 @@ public abstract class DevUtil {
         try {
             debug("execDocker, cmd="+command);
             Process p = Runtime.getRuntime().exec(command);
-            p.waitFor(timeout, TimeUnit.SECONDS);
+            if (timeout < 0) {
+                p.waitFor();
+            } else {
+                p.waitFor(timeout, TimeUnit.SECONDS);
+            }
             if (p.exitValue() != 0) {
                 debug("Error running docker command, return value="+p.exitValue());
                 // read messages from standard err
@@ -746,7 +766,7 @@ public abstract class DevUtil {
      * @return the command string to use to start the container
      */
     private String getContainerCommand() {
-        StringBuffer command = new StringBuffer("docker run -d --rm");
+        StringBuffer command = new StringBuffer("docker run --rm");
         if (httpPort != null) {
             command.append(" -p "+httpPort+":"+httpPort);
         } else {
