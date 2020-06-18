@@ -740,11 +740,13 @@ public abstract class DevUtil {
 
     private void stopContainer() {
         try {
-            info("stopping docker container on process: " + dockerRunProcess);
+            info("Stopping docker container...");
             if (dockerRunProcess != null) {
+                // Emulate docker stop with SIGTERM, wait up to 10 seconds, then SIGKILL
                 dockerRunProcess.destroy();
+                dockerRunProcess.waitFor(10, TimeUnit.SECONDS);
+                dockerRunProcess.destroyForcibly();
                 dockerRunProcess.waitFor();
-                //String s = execDockerCmd("docker stop " + containerID, 30);
             }
         } catch (InterruptedException e) {
             error("Docker container thread was interrupted: " + e.getMessage());
