@@ -550,7 +550,12 @@ public abstract class DevUtil {
                         // If devStop is true server was stopped with Ctl-c, do not throw exception
                         if (devStop.get() == false) {
                             // If a runtime exception occurred in the server task, log and set the exception field
-                            PluginExecutionException e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+                            PluginExecutionException e2;
+                            if (container) {
+                                e2 = new PluginExecutionException("An error occurred while starting the server in the container: " + e.getMessage(), e);
+                            } else {
+                                e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+                            }
                             error(e2.getMessage());
                             serverThreadException = e2;
                         }
