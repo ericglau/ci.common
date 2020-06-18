@@ -266,6 +266,7 @@ public abstract class DevUtil {
     private int appStartupTimeout;
     private int appUpdateTimeout;
     private Thread serverThread;
+    private PluginExecutionException serverThreadException;
     private AtomicBoolean devStop;
     private String hostName;
     private String httpPort;
@@ -540,7 +541,6 @@ public abstract class DevUtil {
                 @Override
                 public void run() {
                     try {
-
                         if (container) {
                             startContainer();
                         } else {
@@ -549,13 +549,13 @@ public abstract class DevUtil {
                     } catch (RuntimeException e) {
                         // If devStop is true server was stopped with Ctl-c, do not throw exception
                         if (devStop.get() == false) {
-                            // If a runtime exception occurred in the server task, log and rethrow
-                            error("An error occurred while starting the server: " + e.getMessage(), e);
-                            //throw e;
+                            // If a runtime exception occurred in the server task, log and set the exception field
+                            PluginExecutionException e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
+                            error(e2.getMessage());
+                            serverThreadException = e2;
                         }
                     }
                 }
-
             });
             serverThread.start();
 
@@ -565,7 +565,7 @@ public abstract class DevUtil {
 
             // If there were already logs from a previous server run, wait for it to be updated.
             // (Except if using container since the file would never be updated if the container failed to start. Instead, just wait for server startup in this case.)
-            if (logsExist && !container) {
+            if (logsExist) {
                 final AtomicBoolean messagesModified = new AtomicBoolean(false);
 
                 // If logs already exist, then watch the directory to ensure
@@ -602,12 +602,19 @@ public abstract class DevUtil {
                 try {
                     observer.initialize();
                     while (!messagesModified.get()) {
+                        checkStopDevMode(); // stop dev mode if the server thread was terminated
                         observer.checkAndNotify();
-                        info("WAITING FOR LOG");
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
                     }
                     debug("messages.log has been changed");
+                } catch (PluginScenarioException e) {
+                    if (serverThreadException != null) {
+                        throw serverThreadException;
+                    } else {
+                        // the server/container failed to start, so wrap this as an execution exception
+                        throw new PluginExecutionException(e);
+                    }
                 } catch (Exception e) {
                     error("An error occured while waiting for the server to update messages.log: " + e.getMessage(), e);
                 } finally {
@@ -616,6 +623,25 @@ public abstract class DevUtil {
                     } catch (Exception e) {
                         debug("Could not destroy FileAlterationObserver for logs directory " + logsDirectory, e);
                     }
+                }
+            } else {
+                // Wait until log exists
+                try {
+                    while (!messagesLogFile.exists()) {
+                        checkStopDevMode(); // stop dev mode if the server thread was terminated
+                        // wait for the log file to appear during server startup
+                        Thread.sleep(500);
+                    }
+                    debug("messages.log has been created");
+                } catch (PluginScenarioException e) {
+                    if (serverThreadException != null) {
+                        throw serverThreadException;
+                    } else {
+                        // the server/container failed to start, so wrap this as an execution exception
+                        throw new PluginExecutionException(e);
+                    }
+                } catch (Exception e) {
+                    error("An error occured while waiting for the server to create messages.log: " + e.getMessage(), e);
                 }
             }
             // Set server start timeout
@@ -681,13 +707,12 @@ public abstract class DevUtil {
             String startContainerCommand = getContainerCommand();
             debug("startContainer, cmd="+startContainerCommand);
 
-            ProcessBuilder pb = new ProcessBuilder();
-            pb.command(getCommandTokens(startContainerCommand));
-            pb.redirectOutput(Redirect.INHERIT);
-            pb.redirectError(Redirect.INHERIT);
-            //pb.redirectErrorStream(true);
-            dockerRunProcess = pb.start();
-            //dockerRunProcess = Runtime.getRuntime().exec(startContainerCommand);
+            ProcessBuilder processBuilder = new ProcessBuilder();
+            processBuilder.command(getCommandTokens(startContainerCommand));
+            processBuilder.redirectOutput(Redirect.INHERIT);
+            // pb.redirectError(Redirect.INHERIT);
+            // pb.redirectErrorStream(true);
+            dockerRunProcess = processBuilder.start();
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0) {
                 info("Error running docker command, return value=" + dockerRunProcess.exitValue());
@@ -697,7 +722,6 @@ public abstract class DevUtil {
                 String errorMessage = new String(d).trim() + " RC=" + dockerRunProcess.exitValue();
                 throw new RuntimeException(errorMessage);
             }
-            info("EXITED process successfully");
         } catch (IOException e) {
             error("Error starting container: " + e.getMessage());
             throw new RuntimeException(e);
