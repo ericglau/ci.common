@@ -552,7 +552,7 @@ public abstract class DevUtil {
                             // If a runtime exception occurred in the server task, log and set the exception field
                             PluginExecutionException e2;
                             if (container) {
-                                e2 = new PluginExecutionException("An error occurred while starting the server in the container: " + e.getMessage(), e);
+                                e2 = new PluginExecutionException("An error occurred while starting the container: " + e.getMessage(), e);
                             } else {
                                 e2 = new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
                             }
