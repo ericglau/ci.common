@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.InputStreamReader;
+import java.lang.ProcessBuilder.Redirect;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -60,6 +61,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -675,7 +677,13 @@ public abstract class DevUtil {
         try {
             String startContainerCommand = getContainerCommand();
             debug("startContainer, cmd="+startContainerCommand);
-            dockerRunProcess = Runtime.getRuntime().exec(startContainerCommand);
+
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.command(getCommandTokens(startContainerCommand));
+            pb.redirectOutput(Redirect.INHERIT);
+            pb.redirectError(Redirect.INHERIT);
+            //pb.redirectErrorStream(true);
+            dockerRunProcess = pb.start();
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0) {
                 debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
@@ -692,6 +700,14 @@ public abstract class DevUtil {
         } catch (InterruptedException e) {
             error("Docker container thread was interrupted: " + e.getMessage());
         }
+    }
+
+    private String[] getCommandTokens(String command) {
+        StringTokenizer st = new StringTokenizer(command);
+        String[] cmdarray = new String[st.countTokens()];
+        for (int i = 0; st.hasMoreTokens(); i++)
+            cmdarray[i] = st.nextToken();
+        return cmdarray;
     }
 
     private void stopContainer() {
