@@ -551,7 +551,7 @@ public abstract class DevUtil {
                         if (devStop.get() == false) {
                             // If a runtime exception occurred in the server task, log and rethrow
                             error("An error occurred while starting the server: " + e.getMessage(), e);
-                            throw e;
+                            //throw e;
                         }
                     }
                 }
@@ -563,7 +563,9 @@ public abstract class DevUtil {
             // that the server stopped
             setDevStop(false);
 
-            if (logsExist) {  // ???  && !container
+            // If there were already logs from a previous server run, wait for it to be updated.
+            // (Except if using container since the file would never be updated if the container failed to start. Instead, just wait for server startup in this case.)
+            if (logsExist && !container) {
                 final AtomicBoolean messagesModified = new AtomicBoolean(false);
 
                 // If logs already exist, then watch the directory to ensure
@@ -601,6 +603,7 @@ public abstract class DevUtil {
                     observer.initialize();
                     while (!messagesModified.get()) {
                         observer.checkAndNotify();
+                        info("WAITING FOR LOG");
                         // wait for the log file to update during server startup
                         Thread.sleep(500);
                     }
@@ -684,9 +687,10 @@ public abstract class DevUtil {
             pb.redirectError(Redirect.INHERIT);
             //pb.redirectErrorStream(true);
             dockerRunProcess = pb.start();
+            //dockerRunProcess = Runtime.getRuntime().exec(startContainerCommand);
             dockerRunProcess.waitFor();
             if (dockerRunProcess.exitValue() != 0) {
-                debug("Error running docker command, return value=" + dockerRunProcess.exitValue());
+                info("Error running docker command, return value=" + dockerRunProcess.exitValue());
                 // read messages from standard err
                 char[] d = new char[1023];
                 new InputStreamReader(dockerRunProcess.getErrorStream()).read(d);
@@ -1762,10 +1766,12 @@ public abstract class DevUtil {
  
     private void checkStopDevMode() throws PluginScenarioException {
         // stop dev mode if the server has been stopped by another process
-        if ((dockerRunProcess == null) &&
-            (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
+        if ((serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED))) {
             if (!this.devStop.get()) {
-                // server was stopped outside of dev mode
+                // an external situation caused the server to stop
+                if (container) {
+                    throw new PluginScenarioException("The container has stopped. Exiting dev mode.");
+                }
                 throw new PluginScenarioException("The server has stopped. Exiting dev mode.");
             } else {
                 // server was stopped by dev mode
