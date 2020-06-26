@@ -777,7 +777,7 @@ public abstract class DevUtil {
         return destMountString;
     }
 
-    private File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
+    public File prepareTempDockerfile(File dockerfile) throws PluginExecutionException {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
