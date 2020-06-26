@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 import org.junit.After;
 import org.junit.Before;
@@ -50,6 +51,13 @@ public class DevUtilDockerfileTest extends BaseDevUtilTest {
         File expected = new File(dockerfiles, expectedFile);
         result = util.prepareTempDockerfile(test);
         assertEquals(new String(Files.readAllBytes(expected.toPath())), new String(Files.readAllBytes(result.toPath())));
+    }
+
+    @Test
+    public void testCondenseLines() throws Exception {
+        String[] lines = new String[]{"COPY --chown=1001:0 \\", "    src/main/liberty/config \\", "    /config/"};
+        String[] result = new String[]{"COPY --chown=1001:0     src/main/liberty/config     /config/"};
+        assertEquals(DevUtil.getCondensedLines(Arrays.asList(result)), DevUtil.getCondensedLines(Arrays.asList(lines)));
     }
 
     @Test

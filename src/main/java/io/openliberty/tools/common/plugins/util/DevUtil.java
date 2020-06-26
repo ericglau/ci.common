@@ -703,6 +703,41 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
+    private void removeComments(List<String> dockerfileLines) throws PluginExecutionException {
+        for (int i = 0; i < dockerfileLines.size(); i++) {
+            // Remove white space from the beginning and end of the line
+            String trimLine = dockerfileLines.get(i).trim();
+            int commentIndex = trimLine.indexOf("#");
+            if (commentIndex >= 0) {
+                String contentBeforeSymbol = trimLine.substring(0, commentIndex);
+                dockerfileLines.set(i, contentBeforeSymbol);
+            }
+        }
+    }
+
+    /**
+     * Consolidate multi-line commands into single lines
+     */
+    public static List<String> getCondensedLines(List<String> dockerfileLines) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        int i = 0;
+        while (i < dockerfileLines.size()) {
+            String pendingLine = dockerfileLines.get(i).trim();
+            int multilineIndex;
+            int j = i+1;
+            while ((multilineIndex = pendingLine.indexOf("\\")) >= 0 && j < dockerfileLines.size()) {
+                String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
+                String nextLine = dockerfileLines.get(j); // don't trim since this is a continuation of the previous command
+                String combined = contentBeforeSymbol + nextLine;
+                pendingLine = combined;
+                j++;
+            }
+            result.add(pendingLine);
+            i = j;
+        }
+        return result;
+    }
+
     private void removeWarFileLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> warFileLines = new ArrayList<String>();
         for (String line : dockerfileLines) {
@@ -781,6 +816,8 @@ public abstract class DevUtil {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
+        removeComments(dockerfileLines);
+        dockerfileLines = getCondensedLines(dockerfileLines);
         removeWarFileLines(dockerfileLines);
         removeCopyLines(dockerfileLines, dockerfile.getParent());
 
