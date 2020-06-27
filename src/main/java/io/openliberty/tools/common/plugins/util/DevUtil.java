@@ -703,22 +703,31 @@ public abstract class DevUtil {
         return dockerfileLines;
     }
 
-    private void removeComments(List<String> dockerfileLines) throws PluginExecutionException {
-        for (int i = 0; i < dockerfileLines.size(); i++) {
+    /**
+     * Trim all lines and get them without comments or empty lines.
+     */
+    public static List<String> getCleanedLines(List<String> dockerfileLines) throws PluginExecutionException {
+        List<String> result = new ArrayList<String>();
+        for (String line : dockerfileLines) {
             // Remove white space from the beginning and end of the line
-            String trimLine = dockerfileLines.get(i).trim();
-            int commentIndex = trimLine.indexOf("#");
+            String pendingLine = line.trim();
+            int commentIndex = pendingLine.indexOf("#");
             if (commentIndex >= 0) {
-                String contentBeforeSymbol = trimLine.substring(0, commentIndex);
-                dockerfileLines.set(i, contentBeforeSymbol);
+                String contentBeforeSymbol = pendingLine.substring(0, commentIndex);
+                // trim again after removing trailing comment
+                pendingLine = contentBeforeSymbol.trim();
+            }
+            if (!pendingLine.isEmpty()) {
+                result.add(pendingLine);
             }
         }
+        return result;
     }
 
     /**
-     * Remove empty lines and combine multi-line commands into single lines
+     * Combine multi-line commands into single lines
      */
-    public static List<String> getConsolidatedLines(List<String> dockerfileLines) throws PluginExecutionException {
+    public static List<String> getCombinedLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
         int i = 0;
         while (i < dockerfileLines.size()) {
@@ -727,16 +736,12 @@ public abstract class DevUtil {
             int j = i+1;
             while ((multilineIndex = pendingLine.indexOf("\\")) >= 0 && j < dockerfileLines.size()) {
                 String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
-                // trims a line before removing its multiline symbol, but not after since the space before the symbol is important
-                String nextLineTrim = dockerfileLines.get(j).trim();
-                String combined = contentBeforeSymbol + nextLineTrim;
+                String nextLine = dockerfileLines.get(j);
+                String combined = contentBeforeSymbol + nextLine;
                 pendingLine = combined;
                 j++;
             }
-            // skip empty lines
-            if (!pendingLine.isEmpty()) {
-                result.add(pendingLine);
-            }
+            result.add(pendingLine);
             i = j;
         }
         return result;
@@ -820,8 +825,8 @@ public abstract class DevUtil {
         // Create a temp Dockerfile to build image from
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
-        removeComments(dockerfileLines);
-        dockerfileLines = getConsolidatedLines(dockerfileLines);
+        dockerfileLines = getCleanedLines(dockerfileLines);
+        dockerfileLines = getCombinedLines(dockerfileLines);
         removeWarFileLines(dockerfileLines);
         removeCopyLines(dockerfileLines, dockerfile.getParent());
 

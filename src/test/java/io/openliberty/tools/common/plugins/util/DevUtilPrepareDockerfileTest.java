@@ -20,7 +20,8 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
@@ -54,10 +55,29 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     }
 
     @Test
-    public void testCondenseLines() throws Exception {
-        String[] lines = new String[]{"COPY --chown=1001:0 \\", "    src/main/liberty/config \\", "    /config/"};
-        String[] result = new String[]{"COPY --chown=1001:0 src/main/liberty/config /config/"};
-        assertEquals(DevUtil.getConsolidatedLines(Arrays.asList(result)), DevUtil.getConsolidatedLines(Arrays.asList(lines)));
+    public void testCleanAndCombine() throws Exception {
+        List<String> test = new ArrayList<String>();
+        test.add("  COPY --chown=1001:0 \\  ");
+        test.add("  # COMMENT ");
+        test.add("    src/main/liberty/config/server.xml \\");
+        test.add("    /config/ #THE FOLLOWING MULTILINE SYMBOL SHOULD BE IGNORED \\");
+        test.add("    \t   COPY secondline.xml /config/  \t  ");
+
+        List<String> expectedCleaned = new ArrayList<String>();
+        expectedCleaned.add("COPY --chown=1001:0 \\");
+        expectedCleaned.add("src/main/liberty/config/server.xml \\");
+        expectedCleaned.add("/config/");
+        expectedCleaned.add("COPY secondline.xml /config/");
+
+        List<String> actualCleaned = DevUtil.getCleanedLines(test);
+        assertEquals(expectedCleaned, actualCleaned);
+
+        List<String> expectedCombined = new ArrayList<String>();
+        expectedCombined.add("COPY --chown=1001:0 src/main/liberty/config/server.xml /config/");
+        expectedCombined.add("COPY secondline.xml /config/");
+        
+        List<String> actualCombined = DevUtil.getCombinedLines(actualCleaned);
+        assertEquals(expectedCombined, actualCombined);
     }
 
     @Test
