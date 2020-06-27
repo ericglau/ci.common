@@ -716,9 +716,9 @@ public abstract class DevUtil {
     }
 
     /**
-     * Consolidate multi-line commands into single lines
+     * Remove empty lines and combine multi-line commands into single lines
      */
-    public static List<String> getCondensedLines(List<String> dockerfileLines) throws PluginExecutionException {
+    public static List<String> getConsolidatedLines(List<String> dockerfileLines) throws PluginExecutionException {
         List<String> result = new ArrayList<String>();
         int i = 0;
         while (i < dockerfileLines.size()) {
@@ -727,12 +727,16 @@ public abstract class DevUtil {
             int j = i+1;
             while ((multilineIndex = pendingLine.indexOf("\\")) >= 0 && j < dockerfileLines.size()) {
                 String contentBeforeSymbol = pendingLine.substring(0, multilineIndex);
-                String nextLine = dockerfileLines.get(j); // don't trim since this is a continuation of the previous command
-                String combined = contentBeforeSymbol + nextLine;
+                // trims a line before removing its multiline symbol, but not after since the space before the symbol is important
+                String nextLineTrim = dockerfileLines.get(j).trim();
+                String combined = contentBeforeSymbol + nextLineTrim;
                 pendingLine = combined;
                 j++;
             }
-            result.add(pendingLine);
+            // skip empty lines
+            if (!pendingLine.isEmpty()) {
+                result.add(pendingLine);
+            }
             i = j;
         }
         return result;
@@ -817,7 +821,7 @@ public abstract class DevUtil {
 
         List<String> dockerfileLines = readDockerfile(dockerfile);
         removeComments(dockerfileLines);
-        dockerfileLines = getCondensedLines(dockerfileLines);
+        dockerfileLines = getConsolidatedLines(dockerfileLines);
         removeWarFileLines(dockerfileLines);
         removeCopyLines(dockerfileLines, dockerfile.getParent());
 

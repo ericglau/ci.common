@@ -26,7 +26,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-public class DevUtilDockerfileTest extends BaseDevUtilTest {
+public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
 
     DevUtil util;
     File dockerfiles = new File("src/test/resources/dockerbuild");
@@ -56,8 +56,8 @@ public class DevUtilDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testCondenseLines() throws Exception {
         String[] lines = new String[]{"COPY --chown=1001:0 \\", "    src/main/liberty/config \\", "    /config/"};
-        String[] result = new String[]{"COPY --chown=1001:0     src/main/liberty/config     /config/"};
-        assertEquals(DevUtil.getCondensedLines(Arrays.asList(result)), DevUtil.getCondensedLines(Arrays.asList(lines)));
+        String[] result = new String[]{"COPY --chown=1001:0 src/main/liberty/config /config/"};
+        assertEquals(DevUtil.getConsolidatedLines(Arrays.asList(result)), DevUtil.getConsolidatedLines(Arrays.asList(lines)));
     }
 
     @Test
