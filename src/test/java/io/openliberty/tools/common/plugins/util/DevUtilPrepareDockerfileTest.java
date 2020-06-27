@@ -16,6 +16,7 @@
 package io.openliberty.tools.common.plugins.util;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,11 +85,17 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
     @Test
     public void testBasicDockerfile() throws Exception {
         testPrepareDockerfile("basic.txt", "basic-expected.txt");
+        assertTrue(util.srcMount.get(0).endsWith("server.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/server.xml"));
     }
 
     @Test
     public void testMultilineDockerfile() throws Exception {
         testPrepareDockerfile("multiline.txt", "multiline-expected.txt");
+        assertTrue(util.srcMount.get(0).endsWith("file1.xml"));
+        assertTrue(util.destMount.get(0).endsWith("/config/filenameWithoutExtension"));
+        assertTrue(util.srcMount.get(1).endsWith("file2.xml"));
+        assertTrue(util.destMount.get(1).endsWith("/config/directoryName/file2.xml"));
     }
 
 }

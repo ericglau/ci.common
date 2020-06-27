@@ -298,8 +298,8 @@ public abstract class DevUtil {
     private String dockerRunOpts;
     private volatile Process dockerRunProcess;
     private File defaultDockerfile;
-    private List<String> srcMount = new ArrayList<String>();
-    private List<String> destMount = new ArrayList<String>();
+    protected List<String> srcMount = new ArrayList<String>();
+    protected List<String> destMount = new ArrayList<String>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,

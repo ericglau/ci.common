@@ -37,10 +37,24 @@ COPY --chown=1001:0 \
 COPY --chown=1001:0 \
 # end::config-userID[]
     # tag::inventory-config[]
-    override.xml \
+    file1.xml \
     # end::inventory-config[]
     # tag::config[]
-    /config/configDropins/overrides
+    /config/filenameWithoutExtension
+    # THE ABOVE IS A FILE SINCE IT DOES NOT END WITH SLASH
+    # end::config[]
+# end::copy-config[]
+
+# tag::copy-config[]
+# tag::config-userID[]
+COPY --chown=1001:0 \
+# end::config-userID[]
+    # tag::inventory-config[]
+    file2.xml \
+    # end::inventory-config[]
+    # tag::config[]
+    /config/directoryName/
+    # THE ABOVE IS A DIRECTORY SINCE IT ENDS WITH SLASH
     # end::config[]
 # end::copy-config[]
 
