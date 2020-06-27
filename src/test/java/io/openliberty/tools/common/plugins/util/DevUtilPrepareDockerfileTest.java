@@ -51,7 +51,8 @@ public class DevUtilPrepareDockerfileTest extends BaseDevUtilTest {
         File test = new File(dockerfiles, testFile);
         File expected = new File(dockerfiles, expectedFile);
         result = util.prepareTempDockerfile(test);
-        assertEquals(new String(Files.readAllBytes(expected.toPath())), new String(Files.readAllBytes(result.toPath())));
+        // trim the overall file content string since the file write can insert an extra line break at the end
+        assertEquals(new String(Files.readAllBytes(expected.toPath())).trim(), new String(Files.readAllBytes(result.toPath())).trim());
     }
 
     @Test

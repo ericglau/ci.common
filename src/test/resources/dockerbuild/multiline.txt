@@ -25,10 +25,22 @@ LABEL \
 COPY --chown=1001:0 \
 # end::config-userID[]
     # tag::inventory-config[]
-    src/main/liberty/config \
+    myconfigdir \
     # end::inventory-config[]
     # tag::config[]
     /config/
+    # end::config[]
+# end::copy-config[]
+
+# tag::copy-config[]
+# tag::config-userID[]
+COPY --chown=1001:0 \
+# end::config-userID[]
+    # tag::inventory-config[]
+    override.xml \
+    # end::inventory-config[]
+    # tag::config[]
+    /config/configDropins/overrides
     # end::config[]
 # end::copy-config[]
 

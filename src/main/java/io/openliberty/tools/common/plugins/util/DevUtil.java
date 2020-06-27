@@ -806,8 +806,7 @@ public abstract class DevUtil {
             warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed for the dev mode container. " + 
                 "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile");
             return false;
-        }
-        else if (!srcMountFile.exists()) {
+        } else if (!srcMountFile.exists()) {
             throw new PluginExecutionException("Cannot build docker image with missing file: " + srcMountFile);
         }
         return true;
