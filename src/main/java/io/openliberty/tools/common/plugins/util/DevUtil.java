@@ -55,6 +55,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -304,7 +305,7 @@ public abstract class DevUtil {
     private long serverStartTimeout;
     private boolean useBuildRecompile;
     private Map<File, Properties> propertyFilesMap;
-    final private Set<FileAlterationObserver> fileObservers;
+    final private List<FileAlterationObserver> fileObservers;
     final private Set<FileAlterationObserver> newFileObservers;
     private AtomicBoolean calledShutdownHook;
     private boolean gradle;
@@ -326,6 +327,7 @@ public abstract class DevUtil {
     private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
     private Set<Path> dockerfileDirectoriesChildren = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
+    private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -354,7 +356,7 @@ public abstract class DevUtil {
         this.useBuildRecompile = useBuildRecompile;
         this.calledShutdownHook = new AtomicBoolean(false);
         this.gradle = gradle;
-        this.fileObservers = new HashSet<FileAlterationObserver>();
+        this.fileObservers = new ArrayList<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
         if (pollingTest) {
@@ -2236,7 +2238,9 @@ public abstract class DevUtil {
                         consolidateFileObservers();
                     }
                     // iterate through file observers
-                    for (FileAlterationObserver observer : fileObservers) {
+                    ListIterator<FileAlterationObserver> it = fileObservers.listIterator();    
+                    while (it.hasNext()) {  
+                        FileAlterationObserver observer = it.next();
                         observer.checkAndNotify();
                     }
                     Thread.sleep(pollingInterval);
@@ -2314,11 +2318,12 @@ public abstract class DevUtil {
         }
     }
 
-    private void addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
+    private FileAlterationObserver addFileAlterationObserver(final ThreadPoolExecutor executor, String parentPath, FileFilter filter)
             throws Exception {
         FileAlterationObserver observer = getFileAlterationObserver(executor, parentPath, filter);
         observer.initialize();
         newFileObservers.add(observer);
+        return observer;
     }
 
     private FileAlterationObserver getFileAlterationObserver(final ThreadPoolExecutor executor, final String parentPath, FileFilter filter) {
@@ -2727,16 +2732,29 @@ public abstract class DevUtil {
      */
     private boolean restartOnDockerfileDirectoryChanged(File file) throws IOException, PluginExecutionException {
         if (isDockerfileDirectoryChanged(file)) {
-            // clear any watched dockerfile directories
-            //for (Path dockerfileChildPath : dockerfileDirectoriesChildren) {
-                
-            //}
-            
+            // Cancel and clear any WatchKeys that were added for to the Dockerfile directories
             for (WatchKey key : dockerfileDirectoriesWatchKeys) {
                 key.cancel();
             }
-            dockerfileDirectoriesChildren.clear();
+            dockerfileDirectoriesWatchKeys.clear();
 
+            // Cancel and clear any FileAlterationObservers that were added for the Dockerfile directories
+            synchronized (newFileObservers) {
+                consolidateFileObservers();
+                for (FileAlterationObserver observer : dockerfileDirectoriesFileObservers) {
+                    // remove the observer
+                    fileObservers.remove(observer);
+                    try {
+                        // destroy the observer
+                        observer.destroy();
+                    } catch (Exception e) {
+                        debug("Could not destroy file observer", e);
+                    }
+                }
+            }
+            dockerfileDirectoriesFileObservers.clear();
+
+            dockerfileDirectoriesChildren.clear();
 
             restartServer(true);
             return true;
@@ -2981,13 +2999,14 @@ public abstract class DevUtil {
      * @throws IOException unable to walk through file tree
      */
     protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
-        debug("Registering all files in directory: " + start.toString());
+        info("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, BasicFileAttributes attrs) throws IOException {
                 if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
+                    info("tracking is POLLING or NOT SET: " + trackingMode);
                     // synchronize on the new observer set since only those are being updated in separate threads
                     synchronized (newFileObservers) {
                         Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
@@ -2997,7 +3016,7 @@ public abstract class DevUtil {
                         // if this path is already observed, ignore it
                         for (FileAlterationObserver observer : tempCombinedObservers) {
                             if (dir.equals(observer.getDirectory().getCanonicalFile().toPath())) {
-                                debug("Skipping subdirectory " + dir.toString() + " since it already being observed");
+                                info("Skipping subdirectory " + dir.toString() + " since it already being observed");
                                 return FileVisitResult.CONTINUE;
                             }
                         }
@@ -3019,10 +3038,11 @@ public abstract class DevUtil {
             
                         try {
                             debug("Adding subdirectory to file observers: " + dir.toString());
-                            addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
+                            FileAlterationObserver observer = addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
                             if (removeOnContainerRebuild) {
                                 // TODO see how to remove from file alteration observer
                                 info("ADDING CHILD POLLING " + dir);
+                                dockerfileDirectoriesFileObservers.add(observer);
                                 dockerfileDirectoriesChildren.add(dir);
                             }
                         } catch (Exception e) {
@@ -3031,7 +3051,7 @@ public abstract class DevUtil {
                     }
                 } 
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
-                    debug("Adding subdirectory to WatchService: " + dir.toString());
+                    info("Adding subdirectory to WatchService: " + dir.toString());
                     WatchKey key = dir.register(watcher,
                             new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
