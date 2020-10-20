@@ -2102,6 +2102,7 @@ public abstract class DevUtil {
                                 info("DOCKERFILE DIRECTORY TO WATCH: " + path);
                                 registerAll(path, executor);
                                 dockerfileDirectoriesToWatch.remove(path);
+                                // Watch these directories for changes
                                 dockerfileDirectories.add(path);
                             }
                         }
@@ -2528,22 +2529,6 @@ public abstract class DevUtil {
 
         Path directory = fileChanged.getParentFile().toPath();
 
-        // Check for directory content changes from directories specified in Dockerfile
-        if (container && !dockerfileDirectories.isEmpty()) {
-            for (Path dockerfilePath : dockerfileDirectories) {
-                Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
-
-                // if the current change's path is a child of the dockerfile path, except for the server logs folder
-                if (directory.startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
-                    info("FOUND A DOCKERFILE CHANGE IN PARENT DIRECTORY " + directory + " FOR FILE " + fileChanged);        
-                } else if (fileChanged.isDirectory() && fileChanged.getCanonicalFile().toPath().startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
-                    info("FOUND A DOCKERFILE CHANGE IN CURRENT DIRECTORY " + fileChanged);
-                } else {
-                    info("IT WAS NOT A DOCKERFILE CHANGE");
-                }
-            }
-        } 
-
         // resource file check
         File resourceParent = null;
         for (File resourceDir : resourceDirs) {
@@ -2616,7 +2601,7 @@ public abstract class DevUtil {
                 if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
                      || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
                     // restart server to load new properties
-                    restartServer();
+                    restartServer(isDockerfileDirectoryChanged(fileChanged, directory));
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             } else if (changeType == ChangeType.DELETE) {
@@ -2634,7 +2619,7 @@ public abstract class DevUtil {
                     } catch (InterruptedException e) {
                         debug("Unexpected InterruptedException handling config file deletion.", e);
                     }
-                    restartServer(false);
+                    restartServer(isDockerfileDirectoryChanged(fileChanged, directory));
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
@@ -2645,25 +2630,32 @@ public abstract class DevUtil {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (changeType == ChangeType.CREATE) {
-                    redeployApp();
+                    if (isDockerfileDirectoryChanged(fileChanged, directory)) {
+                        restartServer(true);
+                    } else {
+                        redeployApp();
+                    }
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
 
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
+                if (isDockerfileDirectoryChanged(fileChanged, directory)) {
+                    restartServer(true);
+                }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
         } else if (bootstrapPropertiesFileParent != null
                    && directory.equals(bootstrapPropertiesFileParent.getCanonicalFile().toPath())
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
             // restart server to load new properties
-            restartServer();
+            restartServer(isDockerfileDirectoryChanged(fileChanged, directory));
         } else if (jvmOptionsFileParent != null
                 && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
             // restart server to load new options
-            restartServer();
+            restartServer(isDockerfileDirectoryChanged(fileChanged, directory));
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
             debug("Resource dir: " + resourceParent.toString());
@@ -2704,6 +2696,27 @@ public abstract class DevUtil {
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
         }
+    }
+
+    private boolean isDockerfileDirectoryChanged(File fileChanged, Path directory) throws IOException {
+        // Check for directory content changes from directories specified in Dockerfile
+        if (container && !dockerfileDirectories.isEmpty()) {
+            for (Path dockerfilePath : dockerfileDirectories) {
+                Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
+
+                // if the current change's path is a child of the dockerfile path, except for the server logs folder
+                if (directory.startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
+                    info("FOUND A DOCKERFILE CHANGE IN PARENT DIRECTORY " + directory + " FOR FILE " + fileChanged);        
+                    return true;
+                } else if (fileChanged.isDirectory() && fileChanged.getCanonicalFile().toPath().startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
+                    info("FOUND A DOCKERFILE CHANGE IN CURRENT DIRECTORY " + fileChanged);
+                    return true;
+                } else {
+                    info("IT WAS NOT A DOCKERFILE CHANGE");
+                }
+            }
+        }
+        return false;
     }
 
     /**
