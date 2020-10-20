@@ -925,12 +925,10 @@ public abstract class DevUtil {
                         if (src.contains("*") || src.contains("?")) {
                             warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (sourceFile.isDirectory()) {
-                            info("FOUND COPY DIRECTORY: " + sourcePath);
                             synchronized(dockerfileDirectoriesToWatch) {
-                                info("IN SYNC PROCESSCOPYLINES");
                                 try {
                                     dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
-                                    info("ADDED DIR " + sourceFile);
+                                    debug("COPY line=" + line + ", src=" + sourcePath + ", added to dockerfileDirectoriesToWatch: " + sourceFile);
                                 } catch (IOException e) {
                                     // Do not fail here.  Let the Docker build fail instead.
                                     error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
@@ -2103,12 +2101,10 @@ public abstract class DevUtil {
                 checkStopDevMode(true);
 
                 if (container) {
-                    // info("BEFORE PROCESS dockerfileDirectoriesToWatch");
                     synchronized(dockerfileDirectoriesToWatch) {
-                        // info("IN SYNC LOOP");
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
-                                info("DOCKERFILE DIRECTORY TO WATCH: " + path);
+                                debug("Registering path from dockerfileDirectoriesToWatch: " + path);
                                 registerAll(path, executor, true);
                                 dockerfileDirectoriesToWatch.remove(path);
                             }
@@ -2786,10 +2782,8 @@ public abstract class DevUtil {
                 // if the current change's path is a child of the dockerfile path, except for the server logs folder or if it's the application itself
                 Path filePath = file.getCanonicalFile().toPath();
                 if (filePath.startsWith(dockerfileChildPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
-                    info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfileChildPath + " IN FILE " + file);
+                    debug("isDockerfileDirectoryChanged=true for directory " + dockerfileChildPath + " with file " + file);
                     return true;
-                } else {
-                    info("IT WAS NOT A DOCKERFILE CHANGE");
                 }
             }
         }
@@ -3021,7 +3015,6 @@ public abstract class DevUtil {
             @Override
             public FileVisitResult preVisitDirectory(final Path dir, BasicFileAttributes attrs) throws IOException {
                 if (trackingMode == FileTrackMode.POLLING || trackingMode == FileTrackMode.NOT_SET) {
-                    info("tracking is POLLING or NOT SET: " + trackingMode);
                     // synchronize on the new observer set since only those are being updated in separate threads
                     synchronized (newFileObservers) {
                         Set<FileAlterationObserver> tempCombinedObservers = new HashSet<FileAlterationObserver>();
@@ -3055,8 +3048,7 @@ public abstract class DevUtil {
                             debug("Adding subdirectory to file observers: " + dir.toString());
                             FileAlterationObserver observer = addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
                             if (removeOnContainerRebuild) {
-                                // TODO see how to remove from file alteration observer
-                                info("ADDING CHILD POLLING " + dir);
+                                debug("Adding to dockerfileDirectoriesChildren for polling: " + dir);
                                 dockerfileDirectoriesFileObservers.add(observer);
                                 dockerfileDirectoriesChildren.add(dir);
                             }
@@ -3072,7 +3064,7 @@ public abstract class DevUtil {
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                             SensitivityWatchEventModifier.HIGH);
                     if (removeOnContainerRebuild) {
-                        info("ADDING CHILD FILEWATCHER " + dir);
+                        debug("Adding to dockerfileDirectoriesChildren for file watcher: " + dir);
                         dockerfileDirectoriesWatchKeys.add(key);
                         dockerfileDirectoriesChildren.add(dir);
                     }
