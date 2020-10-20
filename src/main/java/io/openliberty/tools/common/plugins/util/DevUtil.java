@@ -323,11 +323,8 @@ public abstract class DevUtil {
     protected List<String> srcMount = new ArrayList<String>();
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
-
-    /**
-     *  Map from canonical file's path of each source directory specified in the Dockerfile COPY commands to whether it is currently being watched
-     */
-    private Map<Path, Boolean> dockerfileDirectoriesWatched = new HashMap<Path, Boolean>();
+    private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
+    private Set<Path> dockerfileDirectories = new HashSet<Path>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -924,9 +921,9 @@ public abstract class DevUtil {
                             warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
                         } else if (sourceFile.isDirectory()) {
                             info("FOUND COPY DIRECTORY: " + sourcePath);
-                            synchronized(dockerfileDirectoriesWatched) {
+                            synchronized(dockerfileDirectoriesToWatch) {
                                 try {
-                                    dockerfileDirectoriesWatched.put(sourceFile.getCanonicalFile().toPath(), Boolean.FALSE);
+                                    dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
                                 } catch (IOException e) {
                                     // Do not fail here.  Let the Docker build fail instead.
                                     error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
@@ -2098,14 +2095,14 @@ public abstract class DevUtil {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
                 checkStopDevMode(true);
 
-                synchronized(dockerfileDirectoriesWatched) {
-                    if (!dockerfileDirectoriesWatched.isEmpty()) {
-                        for (Path path : dockerfileDirectoriesWatched.keySet()) {
-                            Boolean watched = dockerfileDirectoriesWatched.get(path);
-                            info("DOCKERFILE DIRECTORY: " + path + ", WATCHED=" + watched);
-                            if (!watched) {
+                if (container) {
+                    synchronized(dockerfileDirectoriesToWatch) {
+                        if (!dockerfileDirectoriesToWatch.isEmpty()) {
+                            for (Path path : dockerfileDirectoriesToWatch) {
+                                info("DOCKERFILE DIRECTORY TO WATCH: " + path);
                                 registerAll(path, executor);
-                                dockerfileDirectoriesWatched.put(path, Boolean.TRUE);
+                                dockerfileDirectoriesToWatch.remove(path);
+                                dockerfileDirectories.add(path);
                             }
                         }
                     }
@@ -2532,12 +2529,15 @@ public abstract class DevUtil {
         Path directory = fileChanged.getParentFile().toPath();
 
         // Check for directory content changes from directories specified in Dockerfile
-        if (container && !dockerfileDirectoriesWatched.isEmpty()) {
-            for (Path dockerfilePath : dockerfileDirectoriesWatched.keySet()) {
-                Boolean watched = dockerfileDirectoriesWatched.get(dockerfilePath);
-                // if the dockerfile path is being watched, and the current change's path is a child of the dockerfile path
-                if (watched.booleanValue() && (directory.startsWith(dockerfilePath) || (fileChanged.isDirectory() && fileChanged.getCanonicalFile().toPath().startsWith(dockerfilePath)))) {
-                    info("FOUND A DOCKERFILE CHANGE");
+        if (container && !dockerfileDirectories.isEmpty()) {
+            for (Path dockerfilePath : dockerfileDirectories) {
+                Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
+
+                // if the current change's path is a child of the dockerfile path, except for the server logs folder
+                if (directory.startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
+                    info("FOUND A DOCKERFILE CHANGE IN PARENT DIRECTORY " + directory + " FOR FILE " + fileChanged);        
+                } else if (fileChanged.isDirectory() && fileChanged.getCanonicalFile().toPath().startsWith(dockerfilePath) && !directory.startsWith(logsPath)) {
+                    info("FOUND A DOCKERFILE CHANGE IN CURRENT DIRECTORY " + fileChanged);
                 } else {
                     info("IT WAS NOT A DOCKERFILE CHANGE");
                 }
