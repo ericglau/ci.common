@@ -324,6 +324,11 @@ public abstract class DevUtil {
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
 
+    /**
+     *  Map from canonical file's path of each source directory specified in the Dockerfile COPY commands to whether it is currently being watched
+     */
+    private Map<Path, Boolean> dockerfileDirectoriesWatched = new HashMap<Path, Boolean>();
+
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
@@ -913,30 +918,31 @@ public abstract class DevUtil {
                     String dest = srcOrDestArguments.get(srcOrDestArguments.size() - 1);
                     List<String> srcArguments = srcOrDestArguments.subList(0, srcOrDestArguments.size() - 1);
                     for (String src : srcArguments) {
+                        String sourcePath = buildContext + "/" + src;
+                        File sourceFile = new File(sourcePath);
                         if (src.contains("*") || src.contains("?")) {
                             warn("The COPY source " + src + " in the Dockerfile line '" + line + "' will not be able to be hot deployed to the dev mode container. Dev mode does not currently support wildcards in the COPY command. If you make changes to files specified by this line, type 'r' and press Enter to rebuild the Docker image and restart the container.");
-                        } else if (isMountableSource(new File(buildContext + "/" + src))) {
-                            String srcMountString = buildContext + "/" + src;
-                            String destMountString = formatDestMount(dest, new File(buildContext + "/" + src));
-                            srcMount.add(srcMountString);
+                        } else if (sourceFile.isDirectory()) {
+                            info("FOUND COPY DIRECTORY: " + sourcePath);
+                            synchronized(dockerfileDirectoriesWatched) {
+                                try {
+                                    dockerfileDirectoriesWatched.put(sourceFile.getCanonicalFile().toPath(), Boolean.FALSE);
+                                } catch (IOException e) {
+                                    // Do not fail here.  Let the Docker build fail instead.
+                                    error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
+                                }
+                            }
+                        } else {
+                            // No need to validate existence of the file, just let the Docker build fail
+                            String destMountString = formatDestMount(dest, sourceFile);
+                            srcMount.add(sourcePath);
                             destMount.add(destMountString);
-                            debug("COPY line=" + line + ", src=" + srcMountString + ", dest=" + destMountString);
+                            debug("COPY line=" + line + ", src=" + sourcePath + ", dest=" + destMountString);
                         }
                     }
                 }
             }
         }
-    }
-
-    private boolean isMountableSource(File srcMountFile) throws PluginExecutionException {
-        if (srcMountFile.isDirectory()) {
-            warn("Files in the directory " + srcMountFile + " will not be able to be hot deployed to the dev mode container. " +
-                "Dev mode does not currently support hot deployment with directories specified in the COPY command. " + 
-                "To allow files to be hot deployed, specify individual files when using the COPY command in your Dockerfile. " + 
-                "Otherwise, if you make changes to files in this directory, type 'r' and press Enter to rebuild the Docker image and restart the container.");
-            return false;
-        } // no need to validate existence of the file, just let the Docker build fail
-        return true;
     }
 
     private String formatDestMount(String destMountString, File srcMountFile) {
@@ -2092,6 +2098,19 @@ public abstract class DevUtil {
                 // Check the server and stop dev mode by throwing an exception if the server stopped.
                 checkStopDevMode(true);
 
+                synchronized(dockerfileDirectoriesWatched) {
+                    if (!dockerfileDirectoriesWatched.isEmpty()) {
+                        for (Path path : dockerfileDirectoriesWatched.keySet()) {
+                            Boolean watched = dockerfileDirectoriesWatched.get(path);
+                            info("DOCKERFILE DIRECTORY: " + path + ", WATCHED=" + watched);
+                            if (!watched) {
+                                registerAll(path, executor);
+                                dockerfileDirectoriesWatched.put(path, Boolean.TRUE);
+                            }
+                        }
+                    }
+                }
+
                 processJavaCompilation(outputDirectory, testOutputDirectory, executor, artifactPaths);
 
                 // check if javaSourceDirectory has been added
@@ -2511,6 +2530,19 @@ public abstract class DevUtil {
         Path configPath = this.configDirectory.getCanonicalFile().toPath();
 
         Path directory = fileChanged.getParentFile().toPath();
+
+        // Check for directory content changes from directories specified in Dockerfile
+        if (container && !dockerfileDirectoriesWatched.isEmpty()) {
+            for (Path dockerfilePath : dockerfileDirectoriesWatched.keySet()) {
+                Boolean watched = dockerfileDirectoriesWatched.get(dockerfilePath);
+                // if the dockerfile path is being watched, and the current change's path is a child of the dockerfile path
+                if (watched.booleanValue() && (directory.startsWith(dockerfilePath) || (fileChanged.isDirectory() && fileChanged.getCanonicalFile().toPath().startsWith(dockerfilePath)))) {
+                    info("FOUND A DOCKERFILE CHANGE");
+                } else {
+                    info("IT WAS NOT A DOCKERFILE CHANGE");
+                }
+            }
+        } 
 
         // resource file check
         File resourceParent = null;
