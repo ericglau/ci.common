@@ -2592,9 +2592,7 @@ public abstract class DevUtil {
                 copyFile(fileChanged, configDirectory, serverDirectory, null);
                 if (changeType == ChangeType.CREATE) {
                     // check if the target config dir (not source config dir) was defined in Dockerfile
-                    if (isDockerfileDirectoryChanged(serverDirectory)) {
-                        restartServer(true);
-                    } else {
+                    if (!restartedOnDockerfileDirectoryChanged(serverDirectory)) {
                         redeployApp();
                     }
                 }
@@ -2606,7 +2604,9 @@ public abstract class DevUtil {
                 if ((fileChanged.getName().equals("bootstrap.properties") && bootstrapPropertiesFileParent == null)
                      || (fileChanged.getName().equals("jvm.options") && jvmOptionsFileParent == null)) {
                     // restart server to load new properties
-                    restartServer(isDockerfileDirectoryChanged(serverDirectory));
+                    if (!restartedOnDockerfileDirectoryChanged(serverDirectory)) {
+                        restartServer();
+                    }
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             } else if (changeType == ChangeType.DELETE) {
@@ -2624,7 +2624,9 @@ public abstract class DevUtil {
                     } catch (InterruptedException e) {
                         debug("Unexpected InterruptedException handling config file deletion.", e);
                     }
-                    restartServer(isDockerfileDirectoryChanged(serverDirectory));
+                    if (!restartedOnDockerfileDirectoryChanged(serverDirectory)) {
+                        restartServer();
+                    }
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
@@ -2635,9 +2637,7 @@ public abstract class DevUtil {
                 copyConfigFolder(fileChanged, serverXmlFileParent, "server.xml");
                 copyFile(fileChanged, serverXmlFileParent, serverDirectory, "server.xml");
                 if (changeType == ChangeType.CREATE) {
-                    if (isDockerfileDirectoryChanged(serverDirectory)) {
-                        restartServer(true);
-                    } else {
+                    if (!restartedOnDockerfileDirectoryChanged(serverDirectory)) {
                         redeployApp();
                     }
                 }
@@ -2646,8 +2646,8 @@ public abstract class DevUtil {
             } else if (changeType == ChangeType.DELETE) {
                 info("Config file deleted: " + fileChanged.getName());
                 deleteFile(fileChanged, configDirectory, serverDirectory, "server.xml");
-                if (isDockerfileDirectoryChanged(serverDirectory)) {
-                    restartServer(true);
+                if (!restartedOnDockerfileDirectoryChanged(serverDirectory)) {
+                    // nothing else needs to be done for config file delete
                 }
                 runTestThread(true, executor, numApplicationUpdatedMessages, true, false);
             }
@@ -2656,13 +2656,17 @@ public abstract class DevUtil {
                    && fileChanged.getCanonicalPath().endsWith(bootstrapPropertiesFile.getName())) {
             // This is for bootstrap.properties outside of the config folder
             // restart server to load new properties
-            restartServer(isDockerfileDirectoryChanged(fileChanged));
+            if (!restartedOnDockerfileDirectoryChanged(fileChanged)) {
+                restartServer();
+            }
         } else if (jvmOptionsFileParent != null
                 && directory.equals(jvmOptionsFileParent.getCanonicalFile().toPath())
                 && fileChanged.getCanonicalPath().endsWith(jvmOptionsFile.getName())) {
             // This is for jvm.options outside of the config folder
             // restart server to load new options
-            restartServer(isDockerfileDirectoryChanged(fileChanged));
+            if (!restartedOnDockerfileDirectoryChanged(fileChanged)) {
+                restartServer();
+            }
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
             debug("Resource dir: " + resourceParent.toString());
@@ -2702,13 +2706,23 @@ public abstract class DevUtil {
             if (reloadedPropertyFile) {
                 runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
             }
-        } else if (isDockerfileDirectoryChanged(fileChanged)) {
-            // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above
-            restartServer(true);
+        } else if (restartedOnDockerfileDirectoryChanged(fileChanged)) {
+            // If contents within a directory specified in a Dockerfile COPY command were changed, and not already processed by one of the other conditions above.
+            // Nothing to do here since the container restarts in the method that triggered this if-statement.
         }
     }
 
-    private boolean isDockerfileDirectoryChanged(File file) throws IOException {
+    /**
+     * Check if the file is within a directory specified in one of the Dockerfile's
+     * COPY commands. If it is, unwatches all such directories then does a container
+     * rebuild and restart, then returns true. Otherwise returns false.
+     * 
+     * @param file
+     * @return
+     * @throws IOException
+     * @throws PluginExecutionException
+     */
+    private boolean restartedOnDockerfileDirectoryChanged(File file) throws IOException, PluginExecutionException {
         // Check for directory content changes from directories specified in Dockerfile
         if (container && !dockerfileDirectories.isEmpty()) {
             for (Path dockerfilePath : dockerfileDirectories) {
@@ -2718,6 +2732,7 @@ public abstract class DevUtil {
                 Path filePath = file.getCanonicalFile().toPath();
                 if (filePath.startsWith(dockerfilePath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
                     info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfilePath + " IN FILE " + file);
+                    restartServer(true);
                     return true;
                 } else {
                     info("IT WAS NOT A DOCKERFILE CHANGE");
