@@ -3008,7 +3008,7 @@ public abstract class DevUtil {
      * @throws IOException unable to walk through file tree
      */
     protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
-        info("Registering all files in directory: " + start.toString());
+        debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
         Files.walkFileTree(start, new SimpleFileVisitor<Path>() {
@@ -3058,7 +3058,7 @@ public abstract class DevUtil {
                     }
                 } 
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
-                    info("Adding subdirectory to WatchService: " + dir.toString());
+                    debug("Adding subdirectory to WatchService: " + dir.toString());
                     WatchKey key = dir.register(watcher,
                             new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
