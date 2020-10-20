@@ -925,6 +925,7 @@ public abstract class DevUtil {
                             synchronized(dockerfileDirectoriesToWatch) {
                                 try {
                                     dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
+                                    info("ADDED DIR " + sourceFile);
                                 } catch (IOException e) {
                                     // Do not fail here.  Let the Docker build fail instead.
                                     error("Could not resolve the canonical path of the directory specified in the Dockerfile: " + sourcePath, e);
@@ -2097,6 +2098,7 @@ public abstract class DevUtil {
                 checkStopDevMode(true);
 
                 if (container) {
+                    info("BEFORE PROCESS dockerfileDirectoriesToWatch");
                     synchronized(dockerfileDirectoriesToWatch) {
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
