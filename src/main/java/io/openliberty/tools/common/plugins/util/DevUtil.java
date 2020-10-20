@@ -923,6 +923,7 @@ public abstract class DevUtil {
                         } else if (sourceFile.isDirectory()) {
                             info("FOUND COPY DIRECTORY: " + sourcePath);
                             synchronized(dockerfileDirectoriesToWatch) {
+                                info("IN SYNC PROCESSCOPYLINES");
                                 try {
                                     dockerfileDirectoriesToWatch.add(sourceFile.getCanonicalFile().toPath());
                                     info("ADDED DIR " + sourceFile);
@@ -2098,8 +2099,9 @@ public abstract class DevUtil {
                 checkStopDevMode(true);
 
                 if (container) {
-                    info("BEFORE PROCESS dockerfileDirectoriesToWatch");
+                    // info("BEFORE PROCESS dockerfileDirectoriesToWatch");
                     synchronized(dockerfileDirectoriesToWatch) {
+                        // info("IN SYNC LOOP");
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
                                 info("DOCKERFILE DIRECTORY TO WATCH: " + path);
@@ -3020,6 +3022,7 @@ public abstract class DevUtil {
                             addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
                             if (removeOnContainerRebuild) {
                                 // TODO see how to remove from file alteration observer
+                                info("ADDING CHILD POLLING " + dir);
                                 dockerfileDirectoriesChildren.add(dir);
                             }
                         } catch (Exception e) {
@@ -3034,6 +3037,7 @@ public abstract class DevUtil {
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                             SensitivityWatchEventModifier.HIGH);
                     if (removeOnContainerRebuild) {
+                        info("ADDING CHILD FILEWATCHER " + dir);
                         dockerfileDirectoriesWatchKeys.add(key);
                         dockerfileDirectoriesChildren.add(dir);
                     }
