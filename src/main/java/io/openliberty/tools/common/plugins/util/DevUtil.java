@@ -305,7 +305,7 @@ public abstract class DevUtil {
     private long serverStartTimeout;
     private boolean useBuildRecompile;
     private Map<File, Properties> propertyFilesMap;
-    final private List<FileAlterationObserver> fileObservers;
+    final private Set<FileAlterationObserver> fileObservers;
     final private Set<FileAlterationObserver> newFileObservers;
     final private Set<FileAlterationObserver> cancelledFileObservers;
     private AtomicBoolean calledShutdownHook;
@@ -357,7 +357,7 @@ public abstract class DevUtil {
         this.useBuildRecompile = useBuildRecompile;
         this.calledShutdownHook = new AtomicBoolean(false);
         this.gradle = gradle;
-        this.fileObservers = new ArrayList<FileAlterationObserver>();
+        this.fileObservers = new HashSet<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
         this.cancelledFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
@@ -2236,9 +2236,7 @@ public abstract class DevUtil {
                         consolidateFileObservers();
                     }
                     // iterate through file observers
-                    ListIterator<FileAlterationObserver> it = fileObservers.listIterator();    
-                    while (it.hasNext()) {
-                        FileAlterationObserver observer = it.next();
+                    for (FileAlterationObserver observer : fileObservers) {
                         if (!cancelledFileObservers.contains(observer)) {
                             observer.checkAndNotify();
                         }
