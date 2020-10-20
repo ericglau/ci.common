@@ -324,7 +324,8 @@ public abstract class DevUtil {
     protected List<String> destMount = new ArrayList<String>();
     private boolean firstStartup = true;
     private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
-    private Set<Path> dockerfileDirectories = new HashSet<Path>();
+    private Set<Path> dockerfileDirectoriesChildren = new HashSet<Path>();
+    private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
@@ -2100,10 +2101,8 @@ public abstract class DevUtil {
                         if (!dockerfileDirectoriesToWatch.isEmpty()) {
                             for (Path path : dockerfileDirectoriesToWatch) {
                                 info("DOCKERFILE DIRECTORY TO WATCH: " + path);
-                                registerAll(path, executor);
+                                registerAll(path, executor, true);
                                 dockerfileDirectoriesToWatch.remove(path);
-                                // Watch these directories for changes
-                                dockerfileDirectories.add(path);
                             }
                         }
                     }
@@ -2723,16 +2722,32 @@ public abstract class DevUtil {
      * @throws PluginExecutionException
      */
     private boolean restartOnDockerfileDirectoryChanged(File file) throws IOException, PluginExecutionException {
+        if (isDockerfileDirectoryChanged(file)) {
+            // clear any watched dockerfile directories
+            //for (Path dockerfileChildPath : dockerfileDirectoriesChildren) {
+                
+            //}
+            
+            for (WatchKey key : dockerfileDirectoriesWatchKeys) {
+                key.cancel();
+            }
+
+            restartServer(true);
+            return true;
+       }
+       return false;
+    }
+
+    private boolean isDockerfileDirectoryChanged(File file) throws IOException, PluginExecutionException {
         // Check for directory content changes from directories specified in Dockerfile
-        if (container && !dockerfileDirectories.isEmpty()) {
-            for (Path dockerfilePath : dockerfileDirectories) {
+        if (container && !dockerfileDirectoriesChildren.isEmpty()) {
+            for (Path dockerfileChildPath : dockerfileDirectoriesChildren) {
                 Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
 
                 // if the current change's path is a child of the dockerfile path, except for the server logs folder or if it's the application itself
                 Path filePath = file.getCanonicalFile().toPath();
-                if (filePath.startsWith(dockerfilePath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
-                    info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfilePath + " IN FILE " + file);
-                    restartServer(true);
+                if (filePath.startsWith(dockerfileChildPath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                    info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfileChildPath + " IN FILE " + file);
                     return true;
                 } else {
                     info("IT WAS NOT A DOCKERFILE CHANGE");
@@ -2948,6 +2963,18 @@ public abstract class DevUtil {
      * @throws IOException unable to walk through file tree
      */
     protected void registerAll(final Path start, final ThreadPoolExecutor executor) throws IOException {
+        registerAll(start, executor, false);
+    }
+
+    /**
+     * Register the parent directory and all sub-directories with the WatchService
+     * 
+     * @param start   parent directory
+     * @param executor the test thread executor
+     * @param removeOnContainerRebuild whether the files should be unwatched if the container is rebuilt
+     * @throws IOException unable to walk through file tree
+     */
+    protected void registerAll(final Path start, final ThreadPoolExecutor executor, final boolean removeOnContainerRebuild) throws IOException {
         debug("Registering all files in directory: " + start.toString());
 
         // register directory and sub-directories
@@ -2987,6 +3014,10 @@ public abstract class DevUtil {
                         try {
                             debug("Adding subdirectory to file observers: " + dir.toString());
                             addFileAlterationObserver(executor, dir.toString(), singleDirectoryFilter);
+                            if (removeOnContainerRebuild) {
+                                // TODO see how to remove from file alteration observer
+                                dockerfileDirectoriesChildren.add(dir);
+                            }
                         } catch (Exception e) {
                             error("Could not observe directory " + dir.toString(), e);
                         }
@@ -2994,10 +3025,14 @@ public abstract class DevUtil {
                 } 
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
                     debug("Adding subdirectory to WatchService: " + dir.toString());
-                    dir.register(watcher,
+                    WatchKey key = dir.register(watcher,
                             new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
                                     StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
                             SensitivityWatchEventModifier.HIGH);
+                    if (removeOnContainerRebuild) {
+                        dockerfileDirectoriesWatchKeys.add(key);
+                        dockerfileDirectoriesChildren.add(dir);
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
