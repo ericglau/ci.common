@@ -2714,10 +2714,10 @@ public abstract class DevUtil {
             for (Path dockerfilePath : dockerfileDirectories) {
                 Path logsPath = new File(serverDirectory, "logs").getCanonicalFile().toPath();
 
-                // if the current change's path is a child of the dockerfile path, except for the server logs folder
+                // if the current change's path is a child of the dockerfile path, except for the server logs folder or if it's the application itself
                 Path filePath = file.getCanonicalFile().toPath();
-                if (filePath.startsWith(dockerfilePath) && !filePath.startsWith(logsPath)) {
-                    info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfilePath + " IN FILE " + file);        
+                if (filePath.startsWith(dockerfilePath) && !filePath.startsWith(logsPath) && !filePath.toString().endsWith(".war.xml")) {
+                    info("FOUND A DOCKERFILE CHANGE FOR PATH " + dockerfilePath + " IN FILE " + file);
                     return true;
                 } else {
                     info("IT WAS NOT A DOCKERFILE CHANGE");
