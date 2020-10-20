@@ -2731,6 +2731,8 @@ public abstract class DevUtil {
             for (WatchKey key : dockerfileDirectoriesWatchKeys) {
                 key.cancel();
             }
+            dockerfileDirectoriesChildren.clear();
+
 
             restartServer(true);
             return true;
