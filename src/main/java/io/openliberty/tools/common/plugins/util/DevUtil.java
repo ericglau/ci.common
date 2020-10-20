@@ -307,6 +307,7 @@ public abstract class DevUtil {
     private Map<File, Properties> propertyFilesMap;
     final private List<FileAlterationObserver> fileObservers;
     final private Set<FileAlterationObserver> newFileObservers;
+    final private Set<FileAlterationObserver> cancelledFileObservers;
     private AtomicBoolean calledShutdownHook;
     private boolean gradle;
     private long pollingInterval;
@@ -358,6 +359,7 @@ public abstract class DevUtil {
         this.gradle = gradle;
         this.fileObservers = new ArrayList<FileAlterationObserver>();
         this.newFileObservers = new HashSet<FileAlterationObserver>();
+        this.cancelledFileObservers = new HashSet<FileAlterationObserver>();
         this.pollingInterval = 100;
         if (pollingTest) {
             this.trackingMode = FileTrackMode.POLLING;
@@ -2239,10 +2241,16 @@ public abstract class DevUtil {
                     }
                     // iterate through file observers
                     ListIterator<FileAlterationObserver> it = fileObservers.listIterator();    
-                    while (it.hasNext()) {  
+                    while (it.hasNext()) {
                         FileAlterationObserver observer = it.next();
-                        observer.checkAndNotify();
+                        if (!cancelledFileObservers.contains(observer)) {
+                            observer.checkAndNotify();
+                        }
                     }
+                    synchronized (cancelledFileObservers) {
+                        removeCancelledFileObservers();
+                    }
+
                     Thread.sleep(pollingInterval);
                 }
             }
@@ -2262,7 +2270,15 @@ public abstract class DevUtil {
      */
     private void consolidateFileObservers() {
         fileObservers.addAll(newFileObservers);
-        newFileObservers.removeAll(newFileObservers);
+        newFileObservers.clear();
+    }
+
+    /**
+     * Remove cancelled file observers from the main observers set
+     */
+    private void removeCancelledFileObservers() {
+        fileObservers.removeAll(cancelledFileObservers);
+        cancelledFileObservers.clear();
     }
 
     private void registerSingleFile(final File registerFile, final ThreadPoolExecutor executor) throws IOException {
@@ -2739,11 +2755,10 @@ public abstract class DevUtil {
             dockerfileDirectoriesWatchKeys.clear();
 
             // Cancel and clear any FileAlterationObservers that were added for the Dockerfile directories
-            synchronized (newFileObservers) {
-                consolidateFileObservers();
+            synchronized (cancelledFileObservers) {
                 for (FileAlterationObserver observer : dockerfileDirectoriesFileObservers) {
-                    // remove the observer
-                    fileObservers.remove(observer);
+                    // add the observer to be cancelled 
+                    cancelledFileObservers.add(observer);
                     try {
                         // destroy the observer
                         observer.destroy();
