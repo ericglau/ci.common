@@ -35,7 +35,7 @@ public class BaseDevUtilTest {
 
         public DevTestUtil(File serverDirectory, File sourceDirectory,
                 File testSourceDirectory, File configDirectory, List<File> resourceDirs, boolean hotTests, boolean skipTests) {
-            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, resourceDirs, hotTests, skipTests, 
+            super(serverDirectory, sourceDirectory, testSourceDirectory, configDirectory, null, resourceDirs, null, hotTests, skipTests, 
                   false, false, null, 30, 30, 5, 500, true, false, false, false, false, null, null, 0, false, null);
         }
 
@@ -182,6 +182,11 @@ public class BaseDevUtilTest {
         public boolean isLooseApplication() {
             // not needed for tests
             return true;
+        }
+
+        @Override
+        public void processResources() {
+            // not needed for tests
         }
         
     }

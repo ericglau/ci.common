@@ -202,6 +202,13 @@ public abstract class DevUtil {
             throws PluginExecutionException;
 
     /**
+     * Perform the Maven/Gradle processing of resources.
+     * 
+     * @param tests If true, these are test resources. Otherwise they are resources from src.
+     */
+    public abstract void processResources(boolean tests);
+
+    /**
      * Run the unit tests
      * 
      * @throws PluginScenarioException  if unit tests failed
@@ -282,6 +289,7 @@ public abstract class DevUtil {
     private File configDirectory;
     private File projectDirectory;
     private List<File> resourceDirs;
+    private List<File> testResourceDirs;
     private boolean hotTests;
     private Path tempConfigPath;
     private boolean skipTests;
@@ -337,7 +345,7 @@ public abstract class DevUtil {
     private final JavaCompilerOptions compilerOptions;
 
     public DevUtil(File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
-            List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
+            List<File> resourceDirs, List<File> testResourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
@@ -348,6 +356,7 @@ public abstract class DevUtil {
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
         this.resourceDirs = resourceDirs;
+        this.testResourceDirs = testResourceDirs;
         this.hotTests = hotTests;
         this.skipTests = skipTests;
         this.skipUTs = skipUTs;
@@ -2215,6 +2224,15 @@ public abstract class DevUtil {
                 }
             }
 
+            HashMap<File, Boolean> testResourceMap = new HashMap<File, Boolean>();
+            for (File testResourceDir : testResourceDirs) {
+                testResourceMap.put(testResourceDir, false);
+                if (testResourceDir.exists()) {
+                    registerAll(testResourceDir.getCanonicalFile().toPath(), executor);
+                    testResourceMap.put(testResourceDir, true);
+                }
+            }
+
             registerSingleFile(buildFile, executor);
 
             if (propertyFilesMap != null) {
@@ -2319,8 +2337,22 @@ public abstract class DevUtil {
                     } else if (resourceMap.get(resourceDir) && !resourceDir.exists()) {
                         // deleted resource directory
                         warn("The resource directory " + resourceDir
-                                + " was deleted.  Restart liberty:dev mode for it to take effect.");
+                                + " was deleted.  Restart dev mode for it to take effect.");
                         resourceMap.put(resourceDir, false);
+                    }
+                }
+
+                // check if testResourceDirectory has been added
+                for (File testResourceDir : testResourceDirs) {
+                    if (!testResourceMap.get(testResourceDir) && testResourceDir.exists()) {
+                        // added resource directory
+                        registerAll(testResourceDir.getCanonicalFile().toPath(), executor);
+                        testResourceMap.put(testResourceDir, true);
+                    } else if (testResourceMap.get(testResourceDir) && !testResourceDir.exists()) {
+                        // deleted resource directory
+                        warn("The test resource directory " + testResourceDir
+                                + " was deleted.  Restart dev mode for it to take effect.");
+                        testResourceMap.put(testResourceDir, false);
                     }
                 }
 
@@ -2712,6 +2744,14 @@ public abstract class DevUtil {
                 break;
             }
         }
+        // test resource file check
+        File testResourceParent = null;
+        for (File testResourceDir : testResourceDirs) {
+            if (directory.startsWith(testResourceDir.getCanonicalFile().toPath())) {
+                testResourceParent = testResourceDir;
+                break;
+            }
+        }
 
         if (fileChanged.isDirectory()) {
             // if new directory added, watch the entire directory
@@ -2856,19 +2896,18 @@ public abstract class DevUtil {
             }
         } else if (resourceParent != null
                 && directory.startsWith(resourceParent.getCanonicalFile().toPath())) { // resources
-            debug("Resource dir: " + resourceParent.toString());
-            if (fileChanged.exists() && (changeType == ChangeType.MODIFY
-                    || changeType == ChangeType.CREATE)) {
-                copyFile(fileChanged, resourceParent, outputDirectory, null);
+            debug("Resource file " + fileChanged + " in dir: " + resourceParent.toString());
+            processResources(false);
 
-                // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
-            } else if (changeType == ChangeType.DELETE) {
-                debug("Resource file deleted: " + fileChanged.getName());
-                deleteFile(fileChanged, resourceParent, outputDirectory, null);
-                // run all tests on resource change
-                runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
-            }
+            // run all tests on resource change
+            runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
+        } else if (testResourceParent != null
+                && directory.startsWith(testResourceParent.getCanonicalFile().toPath())) { // test resources
+            debug("Test resource file " + fileChanged + " in dir: " + resourceParent.toString());
+            processResources(true);
+
+            // run all tests on test resource change
+            runTestThread(true, executor, numApplicationUpdatedMessages, false, false);
         } else if (fileChanged.equals(buildFile)
                 && directory.startsWith(buildFile.getParentFile().getCanonicalFile().toPath())
                 && changeType == ChangeType.MODIFY) { // pom.xml
