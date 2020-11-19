@@ -335,6 +335,7 @@ public abstract class DevUtil {
     private boolean firstStartup = true;
     private Set<Path> dockerfileDirectoriesToWatch = new HashSet<Path>();
     private Set<Path> dockerfileDirectoriesTracked = new HashSet<Path>();
+    private Set<Path> watchKeyDirectories = new HashSet<Path>();
     private Set<WatchKey> dockerfileDirectoriesWatchKeys = new HashSet<WatchKey>();
     private Set<FileAlterationObserver> dockerfileDirectoriesFileObservers = new HashSet<FileAlterationObserver>();
     private final JavaCompilerOptions compilerOptions;
@@ -2593,15 +2594,21 @@ public abstract class DevUtil {
             }
         }
         if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
-            debug("Adding directory to WatchService " + registerFile.getParentFile().toPath() + " for single file " + registerFile.getName());
-            WatchKey key = registerFile.getParentFile().toPath().register(
-                watcher, 
-                new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
-                        StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
-                SensitivityWatchEventModifier.HIGH);
-            if (removeOnContainerRebuild) {
-                debug("Adding file to dockerfileDirectoriesWatchKeys: " + registerFile.getName());
-                dockerfileDirectoriesWatchKeys.add(key);
+            Path path = registerFile.getParentFile().toPath();
+            if (watchKeyDirectories.contains(path)) {
+                debug("Skipping directory in WatchService " + path + " for single file " + registerFile.getName() + " since the directory is already watched");
+            } else {
+                debug("Adding directory to WatchService " + path + " for single file " + registerFile.getName());
+                WatchKey key = path.register(
+                    watcher, 
+                    new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                            StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                    SensitivityWatchEventModifier.HIGH);
+                watchKeyDirectories.add(path);
+                if (removeOnContainerRebuild) {
+                    debug("Adding file to dockerfileDirectoriesWatchKeys: " + registerFile.getName());
+                    dockerfileDirectoriesWatchKeys.add(key);
+                }    
             }
         }
     }
@@ -3351,14 +3358,19 @@ public abstract class DevUtil {
                     }
                 } 
                 if (trackingMode == FileTrackMode.FILE_WATCHER || trackingMode == FileTrackMode.NOT_SET) {
-                    debug("Adding subdirectory to WatchService: " + dir.toString());
-                    WatchKey key = dir.register(watcher,
-                            new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
-                                    StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
-                            SensitivityWatchEventModifier.HIGH);
-                    if (removeOnContainerRebuild) {
-                        debug("Adding to dockerfileDirectoriesWatchKeys: " + dir);
-                        dockerfileDirectoriesWatchKeys.add(key);
+                    if (watchKeyDirectories.contains(dir)) {
+                        debug("Skipping subdirectory in WatchService " + dir.toString() + " since the directory is already watched");
+                    } else {
+                        debug("Adding subdirectory to WatchService: " + dir.toString());
+                        WatchKey key = dir.register(watcher,
+                                new WatchEvent.Kind[] { StandardWatchEventKinds.ENTRY_MODIFY,
+                                        StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_CREATE },
+                                SensitivityWatchEventModifier.HIGH);
+                        watchKeyDirectories.add(dir);
+                        if (removeOnContainerRebuild) {
+                            debug("Adding to dockerfileDirectoriesWatchKeys: " + dir);
+                            dockerfileDirectoriesWatchKeys.add(key);
+                        }
                     }
                 }
                 return FileVisitResult.CONTINUE;
