@@ -31,8 +31,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.ServerSocket;
+import java.net.SocketException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
@@ -1965,71 +1967,70 @@ public abstract class DevUtil {
 
         ServerSocket serverSocket = null;
         while (portToTry < 65535) {
-            if (OSUtil.isWindows()) {
-                try {
-                    // try binding to the portToTry
-                    serverSocket = new ServerSocket(portToTry);
-                    return serverSocket.getLocalPort();
-                } catch (IOException e) {
-                    if (serverSocket != null) {
-                        serverSocket.close();
-                    }
-                    if (isDebugPort) {
-                        // if binding failed, try binding to a random port
-                        serverSocket = new ServerSocket(0);
-                        int availablePort = serverSocket.getLocalPort();
-                        processAvailableDebugPort(preferredPort, portToTry, availablePort);
-                        return availablePort;
+            try {
+                serverSocket = bindNewServerSocket(portToTry);
+                return serverSocket.getLocalPort();
+            } catch (IOException e) {
+                if (isDebugPort) {
+                    // if binding failed, try binding to a random port
+                    serverSocket = bindRandomServerSocket(serverSocket, e);
+                    int availablePort = serverSocket.getLocalPort();
+                    if (portToTry == preferredPort) {
+                        warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
+                                + " as the debug port instead.");
                     } else {
-                        debug("findAvailablePort found port is in use: " + portToTry);
-                        ++portToTry;
+                        debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
+                                + availablePort + " as the debug port instead.");
                     }
-                } finally {
-                    if (serverSocket != null) {
-                        serverSocket.close();
-                    }
+                    alternativeDebugPort = availablePort;
+                    return availablePort;
+                } else {
+                    debug("findAvailablePort found port is in use: " + portToTry);
+                    ++portToTry;
                 }
-            } else {
-                try {
-                    serverSocket = new ServerSocket();
-                    serverSocket.setReuseAddress(false);
-                    // try binding to the loopback address at the port to try
-                    serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);
-                    return serverSocket.getLocalPort();
-                } catch (IOException e) {
-                    if (serverSocket != null) {
-                        if (isDebugPort) {
-                            // if binding failed, try binding to a random port
-                            serverSocket.bind(null, 1);
-                            int availablePort = serverSocket.getLocalPort();
-                            processAvailableDebugPort(preferredPort, portToTry, availablePort);
-                            return availablePort;
-                        } else {
-                            debug("findAvailablePort found port is in use: " + portToTry);
-                            ++portToTry;
-                        }
-                    } else {
-                        throw new IOException("Could not create a server socket.", e);
-                    }
-                } finally {
-                    if (serverSocket != null) {
-                        serverSocket.close();
-                    }
+            } finally {
+                if (serverSocket != null) {
+                    serverSocket.close();
                 }
             }
         }
         return preferredPort; // usual return is from the try or the catch
     }
 
-    private void processAvailableDebugPort(int preferredPort, int portToTry, int availablePort) {
-        if (portToTry == preferredPort) {
-            warn("The debug port " + preferredPort + " is not available.  Using " + availablePort
-                    + " as the debug port instead.");
+    private ServerSocket bindNewServerSocket(int portToTry) throws IOException {
+        if (OSUtil.isWindows()) {
+            // bind directly to portToTry
+            return new ServerSocket(portToTry);
         } else {
-            debug("The previous debug port " + alternativeDebugPort + " is no longer available.  Using "
-                    + availablePort + " as the debug port instead.");
+            ServerSocket serverSocket = new ServerSocket();
+            serverSocket.setReuseAddress(false);
+            // try binding to the loopback address at the port to try
+            serverSocket.bind(new InetSocketAddress(InetAddress.getByName(null), portToTry), 1);   
+            return serverSocket;
         }
-        alternativeDebugPort = availablePort;
+    }
+
+    /**
+     * Bind socket to a random port if preferred port could not be bound.
+     * @param existingServerSocket The existing socket from the first binding try. Should be null in Windows, not null otherwise.
+     * @param e The original exception when trying to bind to the preferred port.
+     * @return The server socket bound to a random port.
+     * @throws IOException If not Windows and the previous server socket was not created.
+     */
+    private ServerSocket bindRandomServerSocket(ServerSocket existingServerSocket, IOException e) throws IOException {
+        if (OSUtil.isWindows()) {
+            if (existingServerSocket != null) {
+                existingServerSocket.close();
+            }
+            // bind directly to random socket
+            return new ServerSocket(0);
+        } else {
+            if (existingServerSocket == null) {
+                throw new IOException("Could not create a server socket.", e);
+            }
+            existingServerSocket.bind(null, 1);
+            return existingServerSocket;
+        }
     }
 
     private HotkeyReader hotkeyReader = null;
