@@ -256,6 +256,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     public abstract void redeployApp() throws PluginExecutionException;
 
     /**
+     * Change the container mode to the specified value
+     */
+    public abstract void changeContainerMode(boolean container);
+
+    /**
      * Get an example command using the server start timeout parameter. The example
      * command is unique to each plugin.
      *
@@ -1583,6 +1588,27 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         configDocument.writeXMLDocument(devModeConfig);
     }
 
+    /**
+     * Restore loose application XML to not use variable substitution, and remove configuration file that defines the variables.
+     * Intended to be called from the shutdown hook when exiting container mode.
+     * Workaround for https://github.com/OpenLiberty/open-liberty/issues/15620
+     */
+    private void cleanUpDevModeConfig() {
+        File devModeConfig = new File(serverDirectory, DEVMODE_CONFIG_XML);
+        boolean deletionResult = devModeConfig.delete();
+        debug("Deleting " + devModeConfig.getAbsolutePath() + " file. Result: " + deletionResult);
+        
+        debug("Setting container mode to false");
+        changeContainerMode(false);
+
+        debug("Redeploying application without container mode...");
+        try {
+            redeployApp();
+        } catch (PluginExecutionException e) {
+            debug("Failed to redeploy application without container mode", e);
+        }
+    }
+
     private void makeParentDirectory(File file) {
         File parentDir = file.getParentFile();
         if (parentDir != null) {
@@ -1889,6 +1915,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             if (container) {
                 cleanUpTempDockerfile();
                 stopContainer();
+                cleanUpDevModeConfig();
             } else {
                 stopServer();
             }
