@@ -341,8 +341,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean hasFeaturesSh;
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
+    private final List<DevCompilePaths> devCompilePaths;
 
-    public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
+    public DevUtil(File buildDirectory, File serverDirectory, List<DevCompilePaths> devCompilePaths, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
@@ -350,8 +351,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
-        this.sourceDirectory = sourceDirectory;
-        this.testSourceDirectory = testSourceDirectory;
+        this.devCompilePaths = devCompilePaths;
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
         this.resourceDirs = resourceDirs;
@@ -2311,8 +2311,6 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * Watch files for changes.
      * 
      * @param buildFile
-     * @param outputDirectory
-     * @param testOutputDirectory
      * @param executor
      * @param compileArtifactPaths Compile classpath elements, or null if this DevUtil instance has useBuildRecompile=true
      * @param testArtifactPaths Test classpath elements, or null if this DevUtil instance has useBuildRecompile=true
@@ -2321,11 +2319,10 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param jvmOptionsFile
      * @throws Exception
      */
-    public void watchFiles(File buildFile, File outputDirectory, File testOutputDirectory,
+    public void watchFiles(File buildFile, 
             final ThreadPoolExecutor executor, List<String> compileArtifactPaths, List<String> testArtifactPaths, File serverXmlFile,
             File bootstrapPropertiesFile, File jvmOptionsFile) throws Exception {
         this.buildFile = buildFile;
-        this.outputDirectory = outputDirectory;
         this.serverXmlFile = serverXmlFile;
         this.bootstrapPropertiesFile = bootstrapPropertiesFile;
         this.jvmOptionsFile = jvmOptionsFile;
@@ -2441,7 +2438,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
 
-                processJavaCompilation(outputDirectory, testOutputDirectory, executor, compileArtifactPaths, testArtifactPaths);
+                processJavaCompilation(devCompilePaths, executor, compileArtifactPaths, testArtifactPaths);
 
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2755,7 +2752,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
-    private void processJavaCompilation(File outputDirectory, File testOutputDirectory, final ThreadPoolExecutor executor,
+    private void processJavaCompilation(List<DevCompilePaths> devCompilePaths, final ThreadPoolExecutor executor,
             List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
@@ -2774,8 +2771,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
-                if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, outputDirectory,
-                        testOutputDirectory)) {
+                if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, devCompilePaths)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                 } else {
@@ -2800,8 +2796,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
-                    if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, outputDirectory,
-                            testOutputDirectory)) {
+                    if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, devCompilePaths)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
                     } else {
@@ -3511,13 +3506,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param javaFilesChanged collection of Java files changed
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
+     * @param devCompilePaths the set of compile paths
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, false, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, false, devCompilePaths);
     }
 
     /**
@@ -3526,13 +3520,12 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param javaFilesChanged collection of Java files changed
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
+     * @param devCompilePaths the set of compile paths
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
-        return recompileJava(javaFilesChanged, artifactPaths, executor, true, outputDirectory, testOutputDirectory);
+            ThreadPoolExecutor executor, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
+        return recompileJava(javaFilesChanged, artifactPaths, executor, true, devCompilePaths);
     }
 
     /**
@@ -3542,12 +3535,11 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @param artifactPaths list of project artifact paths for building the classpath
      * @param executor the test thread executor
      * @param tests indicates whether the files changed were test files
-     * @param outputDirectory the directory for compiled classes
-     * @param testOutputDirectory the directory for compiled test classes
+     * @param devCompilePaths the set of compile paths
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, File outputDirectory, File testOutputDirectory) throws PluginExecutionException {
+            boolean tests, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;
