@@ -341,13 +341,14 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean hasFeaturesSh;
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
+    private boolean lightMode;
 
     public DevUtil(File buildDirectory, File serverDirectory, File sourceDirectory, File testSourceDirectory, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
             boolean container, File dockerfile, String dockerRunOpts, int dockerBuildTimeout, boolean skipDefaultPorts, 
-            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
+            JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation, boolean lightMode) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
         this.sourceDirectory = sourceDirectory;
@@ -399,6 +400,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         this.shownFeaturesShWarning = new AtomicBoolean(false);
         this.hasFeaturesSh = new AtomicBoolean(false);
         this.serverFullyStarted = new AtomicBoolean(false);
+        this.lightMode = lightMode;
     }
 
     /**
@@ -585,6 +587,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      *                                  failed.
      */
     public void startServer(boolean buildContainer, boolean pullParentImage) throws PluginExecutionException {
+        if (lightMode) return;
+
         try {
             final ServerTask serverTask;
             try {
@@ -592,7 +596,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             } catch (Exception e) {
                 throw new PluginExecutionException("An error occurred while starting the server: " + e.getMessage(), e);
             }
-
+            
             // Set debug variables in server.env if debug enabled
             enableServerDebug();
 
@@ -2834,6 +2838,8 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     }
  
     private void checkStopDevMode(boolean skipOnRestart) throws PluginScenarioException {
+        if (lightMode) return;
+        
         // stop dev mode if the server has been stopped by another process
         if (serverThread == null || serverThread.getState().equals(Thread.State.TERMINATED)) {
             // server is restarting if devStop was set to true and we have not called the shutdown hook
