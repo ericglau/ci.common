@@ -341,9 +341,9 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
     protected AtomicBoolean hasFeaturesSh;
     protected AtomicBoolean serverFullyStarted;
     private final File buildDirectory;
-    private final List<DevCompilePaths> devCompilePaths;
+    private final List<DevModule> devModules;
 
-    public DevUtil(File buildDirectory, File serverDirectory, List<DevCompilePaths> devCompilePaths, File configDirectory, File projectDirectory,
+    public DevUtil(File buildDirectory, File serverDirectory, List<DevModule> devModules, File configDirectory, File projectDirectory,
             List<File> resourceDirs, boolean hotTests, boolean skipTests, boolean skipUTs, boolean skipITs,
             String applicationId, long serverStartTimeout, int appStartupTimeout, int appUpdateTimeout,
             long compileWaitMillis, boolean libertyDebug, boolean useBuildRecompile, boolean gradle, boolean pollingTest,
@@ -351,7 +351,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
             JavaCompilerOptions compilerOptions, boolean keepTempDockerfile, String mavenCacheLocation) {
         this.buildDirectory = buildDirectory;
         this.serverDirectory = serverDirectory;
-        this.devCompilePaths = devCompilePaths;
+        this.devModules = devModules;
         this.configDirectory = configDirectory;
         this.projectDirectory = projectDirectory;
         this.resourceDirs = resourceDirs;
@@ -2438,7 +2438,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     }
                 }
 
-                processJavaCompilation(devCompilePaths, executor, compileArtifactPaths, testArtifactPaths);
+                processJavaCompilation(devModules, executor, compileArtifactPaths, testArtifactPaths);
 
                 // check if javaSourceDirectory has been added
                 if (!sourceDirRegistered && this.sourceDirectory.exists()
@@ -2752,7 +2752,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
         return observer;
     }
 
-    private void processJavaCompilation(List<DevCompilePaths> devCompilePaths, final ThreadPoolExecutor executor,
+    private void processJavaCompilation(List<DevModule> devModules, final ThreadPoolExecutor executor,
             List<String> compileArtifactPaths, List<String> testArtifactPaths) throws IOException, PluginExecutionException {
         // process java source files if no changes detected after the compile wait time
         boolean processSources = System.currentTimeMillis() > lastJavaSourceChange + compileWaitMillis;
@@ -2771,7 +2771,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                 if (!failedCompilationJavaSources.isEmpty()) {
                     recompileJavaSources.addAll(failedCompilationJavaSources);
                 }
-                if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, devCompilePaths)) {
+                if (recompileJavaSource(recompileJavaSources, compileArtifactPaths, executor, devModules)) {
                     // successful compilation so we can clear failedCompilation list
                     failedCompilationJavaSources.clear();
                 } else {
@@ -2796,7 +2796,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
                     if (!failedCompilationJavaTests.isEmpty()) {
                         recompileJavaTests.addAll(failedCompilationJavaTests);
                     }
-                    if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, devCompilePaths)) {
+                    if (recompileJavaTest(recompileJavaTests, testArtifactPaths, executor, devModules)) {
                         // successful compilation so we can clear failedCompilation list
                         failedCompilationJavaTests.clear();
                     } else {
@@ -3510,7 +3510,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaSource(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
+            ThreadPoolExecutor executor, List<DevModule> devCompilePaths) throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, false, devCompilePaths);
     }
 
@@ -3524,7 +3524,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJavaTest(Collection<File> javaFilesChanged, List<String> artifactPaths,
-            ThreadPoolExecutor executor, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
+            ThreadPoolExecutor executor, List<DevModule> devCompilePaths) throws PluginExecutionException {
         return recompileJava(javaFilesChanged, artifactPaths, executor, true, devCompilePaths);
     }
 
@@ -3539,7 +3539,7 @@ public abstract class DevUtil extends AbstractContainerSupportUtil {
      * @throws PluginExecutionException if the classes output directory doesn't exist and can't be created
      */
     protected boolean recompileJava(Collection<File> javaFilesChanged, List<String> artifactPaths, ThreadPoolExecutor executor,
-            boolean tests, List<DevCompilePaths> devCompilePaths) throws PluginExecutionException {
+            boolean tests, List<DevModule> devCompilePaths) throws PluginExecutionException {
         try {
             int messageOccurrences = countApplicationUpdatedMessages();
             boolean compileResult;

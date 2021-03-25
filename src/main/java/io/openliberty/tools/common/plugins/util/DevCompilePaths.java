@@ -21,14 +21,14 @@ import java.io.File;
 /**
  * Compile paths specific to a Maven module or Gradle project.
  */
-public class DevCompilePaths {
+public class DevModule {
 
     private File sourceDirectory;
     private File sourceOutputDirectory;
     private File testDirectory;
     private File testOutputDirectory;
 
-    public DevCompilePaths(File sourceDirectory, File sourceOutputDirectory, File testDirectory,
+    public DevModule(File sourceDirectory, File sourceOutputDirectory, File testDirectory,
             File testOutputDirectory) {
         this.sourceDirectory = sourceDirectory;
         this.sourceOutputDirectory = sourceOutputDirectory;
